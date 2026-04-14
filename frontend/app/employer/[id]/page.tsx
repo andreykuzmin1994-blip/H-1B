@@ -5,6 +5,7 @@ import { formatCurrency, severityClass, severityLabel } from '@/lib/formatters';
 import { WageChart } from '@/components/WageChart';
 import { AnomalyFlagList } from '@/components/AnomalyFlagList';
 import { EntityGraph } from '@/components/EntityGraph';
+import { EmployerCharts } from '@/components/EmployerCharts';
 
 export const revalidate = 60;
 
@@ -106,6 +107,36 @@ export default async function EmployerPage({ params }: { params: { id: string } 
     wageData.push({ soc, employer: avg, median });
   }
 
+  // Chart data: filings per fiscal year, top SOCs, USCIS approval history.
+  const yearBuckets = new Map<number, number>();
+  for (const f of employer.filings) {
+    if (f.fiscal_year == null) continue;
+    yearBuckets.set(f.fiscal_year, (yearBuckets.get(f.fiscal_year) ?? 0) + 1);
+  }
+  const byYear = [...yearBuckets.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([year, count]) => ({ year, count }));
+
+  const socBuckets = new Map<string, number>();
+  for (const f of employer.filings) {
+    if (!f.soc_code) continue;
+    socBuckets.set(f.soc_code, (socBuckets.get(f.soc_code) ?? 0) + 1);
+  }
+  const bySoc = [...socBuckets.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([soc, count]) => ({ soc, count }));
+
+  const uscisRows = await prisma.uscisEmployerStats.findMany({
+    where: { employer_id: id },
+    orderBy: { fiscal_year: 'asc' },
+  });
+  const uscisByYear = uscisRows.map((r) => ({
+    year: r.fiscal_year,
+    approvals: r.initial_approvals,
+    denials: r.initial_denials,
+  }));
+
   return (
     <div className="space-y-8">
       <section className="flex flex-wrap items-start justify-between gap-4">
@@ -173,6 +204,11 @@ export default async function EmployerPage({ params }: { params: { id: string } 
             </Link>
           )}
         </div>
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Filing activity</h2>
+        <EmployerCharts byYear={byYear} bySoc={bySoc} uscisByYear={uscisByYear} />
       </section>
 
       <section>

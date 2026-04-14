@@ -146,8 +146,13 @@ def build_officer_links() -> int:
     return added
 
 
-def build_name_variants(threshold: float = 85.0) -> int:
-    """Fuzzy-match employer names within the same state using rapidfuzz token_sort_ratio."""
+def build_name_variants(threshold: float = 85.0, prefix_len: int = 3) -> int:
+    """Fuzzy-match employer names within the same state using rapidfuzz token_sort_ratio.
+
+    Uses (state, first-N-chars) blocking before quadratic comparison to keep
+    this tractable on large datasets. Names too short for the prefix still
+    compare inside their own short-key bucket.
+    """
     added = 0
     with get_session() as session:
         rows = session.execute(
@@ -156,15 +161,21 @@ def build_name_variants(threshold: float = 85.0) -> int:
                 Employer.state.is_not(None),
             )
         ).all()
-        by_state: dict[str, list[tuple[int, str]]] = defaultdict(list)
+        # Bucket by (state, first-N-chars of normalized name) to avoid O(n^2) across state.
+        buckets: dict[tuple[str, str], list[tuple[int, str]]] = defaultdict(list)
         for eid, name, state in rows:
-            by_state[state].append((eid, name))
+            if not name:
+                continue
+            key = (state, name[:prefix_len])
+            buckets[key].append((eid, name))
 
-        for state, entries in by_state.items():
+        for _, entries in buckets.items():
+            if len(entries) < 2:
+                continue
             for (a_id, a_name), (b_id, b_name) in combinations(entries, 2):
                 if not a_name or not b_name or a_name == b_name:
                     continue
-                # Cheap prefix filter to avoid O(n^2) scoring blow-ups
+                # Cheap length-ratio filter to avoid scoring wildly different lengths.
                 if abs(len(a_name) - len(b_name)) > max(len(a_name), len(b_name)) * 0.5:
                     continue
                 score = fuzz.token_sort_ratio(a_name, b_name)

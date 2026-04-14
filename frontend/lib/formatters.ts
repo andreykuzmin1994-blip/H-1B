@@ -21,15 +21,3 @@ export function severityLabel(score: number): string {
   return 'LOW';
 }
 
-export function addressHash(parts: { address_line1?: string | null; city?: string | null; state?: string | null; zip?: string | null }): string {
-  const s = [parts.address_line1, parts.city, parts.state, parts.zip]
-    .filter(Boolean)
-    .map((s) => (s ?? '').toUpperCase().trim())
-    .join('|');
-  // Simple DJB2 hash for URL-safe identifier
-  let hash = 5381;
-  for (let i = 0; i < s.length; i++) {
-    hash = ((hash << 5) + hash) ^ s.charCodeAt(i);
-  }
-  return (hash >>> 0).toString(16);
-}

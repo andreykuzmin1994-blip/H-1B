@@ -43,7 +43,9 @@ class Employer(Base):
     total_lca_count: Mapped[int] = mapped_column(Integer, default=0)
     anomaly_score: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
     filings: Mapped[list["LcaFiling"]] = relationship(back_populates="employer")
     violations: Mapped[list["Violation"]] = relationship(back_populates="employer")

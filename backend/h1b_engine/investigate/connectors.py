@@ -246,6 +246,18 @@ class OpenCorporatesConnector(InvestigationConnector):
         }
 
 
+class PublicWebPresenceConnector(InvestigationConnector):
+    """Stub for website / LinkedIn / BBB / Google Maps presence.
+
+    Phase 2 connector per spec. Returns a sentinel until implemented.
+    """
+
+    name = "public_web_presence"
+
+    def fetch(self, employer_id: int) -> dict[str, Any]:
+        return {"available": False, "reason": "not_implemented"}
+
+
 class AnomalyFlagConnector(InvestigationConnector):
     name = "anomaly_flags"
 

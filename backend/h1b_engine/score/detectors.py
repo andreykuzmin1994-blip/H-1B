@@ -19,8 +19,10 @@ from h1b_engine.db.models import (
     UscisEmployerStats,
     Violation,
 )
+from h1b_engine.graph.builder import subgraph_for_employer
 from h1b_engine.score.flags import (
     ANOMALY_FLAGS,
+    BUSINESS_PARK_KEYWORDS,
     NAICS_SOC_HARD_RULES,
     NON_SPECIALTY_SOCS,
     RELATIONSHIP_WEIGHTS,
@@ -76,6 +78,9 @@ def compute_address_clusters(session: Session, threshold: int = 5) -> set[str]:
     clusters = set()
     for a, c, s, z, n in rows:
         if n >= threshold:
+            combined = f"{a or ''} {c or ''}".upper()
+            if any(kw in combined for kw in BUSINESS_PARK_KEYWORDS):
+                continue
             clusters.add(f"{a}|{c}|{s}|{z}")
     return clusters
 
@@ -271,23 +276,27 @@ def detect_for_employer(
         )
 
     # -- NEW_ENTITY_IMMEDIATE_FILING ----------------------------------------
-    sos = session.execute(
+    sos_rows = session.execute(
         select(SosEntity).where(SosEntity.employer_id == employer.id)
-    ).scalar_one_or_none()
-    if sos and sos.formation_date and employer.first_filing_date:
-        gap = employer.first_filing_date - sos.formation_date
-        if timedelta(days=0) <= gap <= timedelta(days=90):
-            outputs.append(
-                (
-                    ANOMALY_FLAGS["NEW_ENTITY_IMMEDIATE_FILING"],
-                    {
-                        "formation_date": sos.formation_date.isoformat(),
-                        "first_filing_date": employer.first_filing_date.isoformat(),
-                        "gap_days": gap.days,
-                    },
-                    None,
+    ).scalars().all()
+    if employer.first_filing_date:
+        for sos in sos_rows:
+            if not sos.formation_date:
+                continue
+            gap = employer.first_filing_date - sos.formation_date
+            if timedelta(days=0) <= gap <= timedelta(days=90):
+                outputs.append(
+                    (
+                        ANOMALY_FLAGS["NEW_ENTITY_IMMEDIATE_FILING"],
+                        {
+                            "formation_date": sos.formation_date.isoformat(),
+                            "first_filing_date": employer.first_filing_date.isoformat(),
+                            "gap_days": gap.days,
+                        },
+                        None,
+                    )
                 )
-            )
+                break
 
     # -- STAFFING_NO_CLIENT --------------------------------------------------
     if employer.naics_code in STAFFING_NAICS:
@@ -383,17 +392,19 @@ def detect_for_employer(
 
     # -- CONNECTED_TO_VIOLATOR ----------------------------------------------
     if violator_ids and employer.id not in violator_ids:
-        # direct 1-hop neighbors
-        neighbor_rows = session.execute(
-            select(EntityRelationship).where(
-                (EntityRelationship.employer_id_a == employer.id)
-                | (EntityRelationship.employer_id_b == employer.id)
-            )
-        ).scalars().all()
-        for rel in neighbor_rows:
-            other = rel.employer_id_b if rel.employer_id_a == employer.id else rel.employer_id_a
-            if other in violator_ids:
-                weight = RELATIONSHIP_WEIGHTS.get(rel.relationship_type, 0.5)
+        graph = subgraph_for_employer(employer.id, max_depth=2)
+        for node in graph["nodes"]:
+            if node["id"] == employer.id:
+                continue
+            if node["id"] in violator_ids:
+                # Find strongest edge type connecting us (best guess)
+                edge = next(
+                    (e for e in graph["edges"]
+                     if (e["source"] == employer.id and e["target"] == node["id"])
+                     or (e["target"] == employer.id and e["source"] == node["id"])),
+                    None,
+                )
+                weight = RELATIONSHIP_WEIGHTS.get(edge["type"] if edge else "", 0.5)
                 base = ANOMALY_FLAGS["CONNECTED_TO_VIOLATOR"]
                 outputs.append(
                     (
@@ -404,9 +415,10 @@ def detect_for_employer(
                             description=base.description,
                         ),
                         {
-                            "violator_employer_id": other,
-                            "relationship_type": rel.relationship_type,
+                            "violator_employer_id": node["id"],
+                            "relationship_type": edge["type"] if edge else None,
                             "weight": weight,
+                            "depth": node["depth"],
                         },
                         None,
                     )

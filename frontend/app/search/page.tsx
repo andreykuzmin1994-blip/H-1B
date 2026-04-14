@@ -4,42 +4,99 @@ import { severityClass, severityLabel } from '@/lib/formatters';
 
 export const dynamic = 'force-dynamic';
 
-async function search(q: string) {
-  if (!q) return [];
+interface SearchParams {
+  q?: string;
+  state?: string;
+  naics?: string;
+  minScore?: string;
+  flag?: string;
+}
+
+async function search({ q, state, naics, minScore, flag }: SearchParams) {
+  const anyFilter = q || state || naics || minScore || flag;
+  if (!anyFilter) return [];
+
+  const where: any = {};
+  if (q) {
+    where.OR = [
+      { name: { contains: q, mode: 'insensitive' } },
+      { name_normalized: { contains: q.toUpperCase() } },
+      { city: { contains: q, mode: 'insensitive' } },
+    ];
+  }
+  if (state) where.state = state.toUpperCase().slice(0, 2);
+  if (naics) where.naics_code = { startsWith: naics };
+  if (minScore) {
+    const n = Number(minScore);
+    if (Number.isFinite(n)) where.anomaly_score = { gte: n };
+  }
+  if (flag) where.flags = { some: { flag_type: flag } };
+
   return prisma.employer.findMany({
-    where: {
-      OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { name_normalized: { contains: q.toUpperCase() } },
-        { city: { contains: q, mode: 'insensitive' } },
-      ],
-    },
+    where,
     orderBy: { anomaly_score: 'desc' },
-    take: 50,
+    take: 100,
   });
 }
 
-export default async function SearchPage({ searchParams }: { searchParams: { q?: string } }) {
-  const q = (searchParams.q || '').trim();
-  const results = await search(q);
+export default async function SearchPage({ searchParams }: { searchParams: SearchParams }) {
+  const results = await search(searchParams);
+  const hasFilters = Boolean(
+    searchParams.q ||
+      searchParams.state ||
+      searchParams.naics ||
+      searchParams.minScore ||
+      searchParams.flag,
+  );
 
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold">Employer search</h1>
-      <form className="flex gap-2" method="get">
+      <form className="grid grid-cols-1 gap-2 md:grid-cols-6" method="get">
         <input
           name="q"
-          defaultValue={q}
-          placeholder="Employer name, city, or keyword"
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          defaultValue={searchParams.q ?? ''}
+          placeholder="Name, city, keyword"
+          className="rounded border border-gray-300 px-3 py-2 text-sm md:col-span-2"
         />
-        <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white" type="submit">
+        <input
+          name="state"
+          defaultValue={searchParams.state ?? ''}
+          placeholder="State (2-char)"
+          maxLength={2}
+          className="rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <input
+          name="naics"
+          defaultValue={searchParams.naics ?? ''}
+          placeholder="NAICS prefix"
+          className="rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <input
+          name="minScore"
+          type="number"
+          min={0}
+          max={100}
+          defaultValue={searchParams.minScore ?? ''}
+          placeholder="Min score"
+          className="rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <input
+          name="flag"
+          defaultValue={searchParams.flag ?? ''}
+          placeholder="Flag type"
+          className="rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <button
+          className="rounded bg-blue-600 px-4 py-2 text-sm text-white md:col-span-6"
+          type="submit"
+        >
           Search
         </button>
       </form>
-      {q && (
+      {hasFilters && (
         <div className="text-sm text-gray-600">
-          {results.length} result{results.length === 1 ? '' : 's'} for &ldquo;{q}&rdquo;
+          {results.length} result{results.length === 1 ? '' : 's'}
         </div>
       )}
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">

@@ -23,7 +23,13 @@ def data_dir() -> Path:
 
 @contextmanager
 def ingestion_run(source: str, params: dict | None = None) -> Iterator[tuple[Session, IngestionRun]]:
-    """Open a session and record an IngestionRun row around the work."""
+    """Open a session and record an IngestionRun row around the work.
+
+    On success, marks the existing run row as ``success``.
+    On failure, rolls back any in-flight data changes, then updates the SAME
+    run row in place to ``failed`` and re-raises. Exactly one IngestionRun
+    row per call either way.
+    """
     with get_session() as session:
         run = IngestionRun(source=source, params=params, status="running")
         session.add(run)
@@ -34,16 +40,11 @@ def ingestion_run(source: str, params: dict | None = None) -> Iterator[tuple[Ses
             run.status = "success"
         except Exception as exc:
             session.rollback()
-            # Re-open a small session to mark failure
-            with get_session() as s2:
-                failed = IngestionRun(
-                    source=source,
-                    params=params,
-                    status="failed",
-                    finished_at=datetime.utcnow(),
-                    error=str(exc)[:2000],
-                )
-                s2.add(failed)
+            run.status = "failed"
+            run.finished_at = datetime.utcnow()
+            run.error = str(exc)[:2000]
+            session.add(run)
+            session.commit()
             raise
 
 

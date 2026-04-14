@@ -10,10 +10,6 @@ from h1b_engine.db.models import Employer
 from h1b_engine.investigate.connectors import fetch_all
 
 
-def _line(char: str = "─", width: int = 63) -> str:
-    return char * width
-
-
 def _rule(title: str) -> str:
     suffix_len = max(1, 63 - len(title) - 4)
     return f"─── {title} {'─' * suffix_len}"
@@ -198,9 +194,9 @@ def generate_report(employer_id: int) -> str:
         lines.append("No formal action recommended based on current flags.")
     lines.append("")
 
-    lines.append(_line("═"))
+    lines.append("═" * 63)
     lines.append("Copy-paste text for DOL complaint form and USCIS tip form below.")
-    lines.append(_line("═"))
+    lines.append("═" * 63)
     lines.append("")
     lines.append(tip_text(employer_id, data=data))
     return "\n".join(lines)

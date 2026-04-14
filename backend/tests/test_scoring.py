@@ -9,8 +9,10 @@ from sqlalchemy import select
 from h1b_engine.db.models import (
     AnomalyFlag,
     Employer,
+    EntityRelationship,
     LcaFiling,
     SocWageBenchmark,
+    SosEntity,
     UscisEmployerStats,
     Violation,
 )
@@ -188,3 +190,152 @@ def test_post_sanction_flag_triggers(session_factory):
     ).scalars().all()
     flag_types = {f.flag_type for f in flags}
     assert "POST_SANCTION_FILING" in flag_types
+
+
+def test_new_entity_immediate_filing_multi_row(session_factory):
+    """Confirm the detector scans ALL SosEntity rows (not just the first)."""
+    session = session_factory()
+    emp = Employer(
+        name="Shell Holdings LLC",
+        name_normalized="SHELL HOLDINGS",
+        state="DE",
+        naics_code="541512",
+        total_lca_count=1,
+        first_filing_date=date(2024, 1, 15),
+        last_filing_date=date(2024, 1, 15),
+    )
+    session.add(emp)
+    session.flush()
+    session.add(
+        LcaFiling(
+            case_number="Z1",
+            employer_id=emp.id,
+            naics_code="541512",
+            soc_code="15-1252",
+            wage_annualized=150000,
+            received_date=date(2024, 1, 15),
+            fiscal_year=2024,
+        )
+    )
+    # First SOS row: formed 2+ years before first filing (too old, should NOT trigger)
+    session.add(
+        SosEntity(
+            employer_id=emp.id,
+            state="DE",
+            entity_name="Shell Holdings LLC",
+            entity_type="LLC",
+            formation_date=date(2021, 1, 1),
+        )
+    )
+    # Second SOS row: formed 30 days before first filing (WITHIN 90-day window)
+    session.add(
+        SosEntity(
+            employer_id=emp.id,
+            state="NV",
+            entity_name="Shell Holdings NV LLC",
+            entity_type="LLC",
+            formation_date=date(2023, 12, 16),
+        )
+    )
+    session.commit()
+
+    score_all([emp.id])
+    flags = session.execute(
+        select(AnomalyFlag).where(AnomalyFlag.employer_id == emp.id)
+    ).scalars().all()
+    assert "NEW_ENTITY_IMMEDIATE_FILING" in {f.flag_type for f in flags}
+
+
+def test_connected_to_violator_two_hops(session_factory):
+    """A (no violations) connected to C (violator) via B: flag should fire at depth=2."""
+    session = session_factory()
+
+    def _mk(name: str, state: str) -> Employer:
+        emp = Employer(
+            name=name,
+            name_normalized=name.upper(),
+            state=state,
+            naics_code="541512",
+            total_lca_count=1,
+            first_filing_date=date(2024, 1, 1),
+            last_filing_date=date(2024, 1, 1),
+        )
+        session.add(emp)
+        session.flush()
+        session.add(
+            LcaFiling(
+                case_number=f"CASE-{name}",
+                employer_id=emp.id,
+                naics_code="541512",
+                soc_code="15-1252",
+                wage_annualized=150000,
+                received_date=date(2024, 1, 1),
+                fiscal_year=2024,
+            )
+        )
+        return emp
+
+    a = _mk("alpha co", "WA")
+    b = _mk("bravo co", "OR")
+    c = _mk("charlie co", "ID")
+
+    # A-B shared address (depth 1 from A), B-C shared officer (depth 2 from A)
+    session.add_all(
+        [
+            EntityRelationship(
+                employer_id_a=min(a.id, b.id),
+                employer_id_b=max(a.id, b.id),
+                relationship_type="SHARED_ADDRESS",
+                confidence=0.6,
+            ),
+            EntityRelationship(
+                employer_id_a=min(b.id, c.id),
+                employer_id_b=max(b.id, c.id),
+                relationship_type="SHARED_OFFICER",
+                confidence=1.0,
+            ),
+        ]
+    )
+    # C is the violator
+    session.add(
+        Violation(
+            employer_id=c.id,
+            source="DOL_WILLFUL",
+            violation_type="WILLFUL_VIOLATOR",
+            violation_date=date(2023, 1, 1),
+        )
+    )
+    session.commit()
+
+    score_all([a.id])
+    flags = session.execute(
+        select(AnomalyFlag).where(AnomalyFlag.employer_id == a.id)
+    ).scalars().all()
+    connected = [f for f in flags if f.flag_type == "CONNECTED_TO_VIOLATOR"]
+    assert len(connected) == 1
+    evidence = connected[0].evidence or {}
+    assert evidence.get("violator_employer_id") == c.id
+    assert evidence.get("depth") == 2
+
+
+def test_business_park_not_shared_address_cluster(session_factory):
+    """A business-park address should NOT produce a SHARED_ADDRESS_CLUSTER flag."""
+    session = session_factory()
+    for i in range(6):
+        emp = Employer(
+            name=f"Tenant {i} LLC",
+            name_normalized=f"TENANT {i}",
+            state="TX",
+            naics_code="541512",
+            address_line1="100 Crosswinds Business Park",
+            city="Austin",
+            zip="78701",
+            total_lca_count=1,
+            first_filing_date=date(2024, 1, 1),
+            last_filing_date=date(2024, 1, 1),
+        )
+        session.add(emp)
+    session.commit()
+    score_all()
+    flags = session.execute(select(AnomalyFlag)).scalars().all()
+    assert not any(f.flag_type == "SHARED_ADDRESS_CLUSTER" for f in flags)
