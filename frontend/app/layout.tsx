@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/search">Search</Link>
               <Link href="/map">Map</Link>
               <Link href="/violators">Violators</Link>
+              <Link href="/layoffs">Layoffs</Link>
               <Link href="/api/v1/anomalies" className="text-gray-500">
                 API
               </Link>

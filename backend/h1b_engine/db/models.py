@@ -50,6 +50,7 @@ class Employer(Base):
     filings: Mapped[list["LcaFiling"]] = relationship(back_populates="employer")
     violations: Mapped[list["Violation"]] = relationship(back_populates="employer")
     flags: Mapped[list["AnomalyFlag"]] = relationship(back_populates="employer")
+    layoff_events: Mapped[list["LayoffEvent"]] = relationship(back_populates="employer")
 
     __table_args__ = (
         Index("idx_employers_address", "address_line1", "city", "state"),
@@ -232,6 +233,50 @@ class SocWageBenchmark(Base):
             name="uq_soc_wage_benchmark",
         ),
         Index("idx_soc_wage_lookup", "soc_code", "oews_year", "area_type"),
+    )
+
+
+class LayoffEvent(Base):
+    """Layoff notices linked to an employer.
+
+    Sourced from federal / state WARN Act filings (the only authoritative public
+    record of US mass layoffs, required at 60 days' notice for layoffs >= 50
+    workers) plus optional supplemental feeds such as layoffs.fyi for layoffs
+    that fall under WARN thresholds.
+
+    This is the substrate for the LAYOFF_WITH_CONCURRENT_H1B detector, which
+    checks the INA section 212(n)(1)(E) 90-day non-displacement window.
+    """
+
+    __tablename__ = "layoff_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    employer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("employers.id", ondelete="SET NULL"), index=True
+    )
+    employer_name_raw: Mapped[str | None] = mapped_column(String(500))
+    source: Mapped[str] = mapped_column(
+        String(30), nullable=False
+    )  # WARN_FEDERAL|WARN_STATE_{XX}|LAYOFFS_FYI|NEWS
+    notice_date: Mapped[date | None] = mapped_column(Date)
+    effective_date: Mapped[date | None] = mapped_column(Date, index=True)
+    workers_affected: Mapped[int | None] = mapped_column(Integer)
+    location_city: Mapped[str | None] = mapped_column(String(200))
+    location_state: Mapped[str | None] = mapped_column(String(2))
+    location_zip: Mapped[str | None] = mapped_column(String(10))
+    reason: Mapped[str | None] = mapped_column(String(200))
+    industry: Mapped[str | None] = mapped_column(String(200))
+    source_url: Mapped[str | None] = mapped_column(String(1000))
+    external_id: Mapped[str | None] = mapped_column(String(200))
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    employer: Mapped[Employer | None] = relationship(back_populates="layoff_events")
+
+    __table_args__ = (
+        UniqueConstraint("source", "external_id", name="uq_layoff_source_extid"),
+        Index("idx_layoff_effective_date", "effective_date"),
+        Index("idx_layoff_location", "location_state", "location_city"),
     )
 
 

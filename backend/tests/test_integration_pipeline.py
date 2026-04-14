@@ -31,6 +31,7 @@ EXPECTED_CONNECTOR_KEYS = {
     "entity_graph",
     "address_verification",
     "opencorporates",
+    "layoffs",
 }
 
 

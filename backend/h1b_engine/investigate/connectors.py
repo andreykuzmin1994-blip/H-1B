@@ -17,6 +17,7 @@ from h1b_engine.db.models import (
     AnomalyFlag,
     Employer,
     EntityRelationship,
+    LayoffEvent,
     LcaFiling,
     SocWageBenchmark,
     SosEntity,
@@ -258,6 +259,87 @@ class PublicWebPresenceConnector(InvestigationConnector):
         return {"available": False, "reason": "not_implemented"}
 
 
+class LayoffConnector(InvestigationConnector):
+    """Fetch WARN / layoffs.fyi notices and summarize H-1B concurrency.
+
+    The report and tip generator use this to populate the INA 212(n)(1)(E)
+    displacement narrative: total workers laid off, notice dates, and the set
+    of LCAs filed inside the 90-day window.
+    """
+
+    name = "layoffs"
+    WINDOW_DAYS = 90
+
+    def fetch(self, employer_id: int) -> dict[str, Any]:
+        from datetime import timedelta
+
+        with get_session() as session:
+            events = session.execute(
+                select(LayoffEvent).where(LayoffEvent.employer_id == employer_id)
+            ).scalars().all()
+            if not events:
+                return {"count": 0, "events": [], "concurrent_filings": []}
+
+            filings = session.execute(
+                select(LcaFiling).where(LcaFiling.employer_id == employer_id)
+            ).scalars().all()
+
+            concurrent: list[dict[str, Any]] = []
+            window = timedelta(days=self.WINDOW_DAYS)
+            for event in events:
+                pivot = event.effective_date or event.notice_date
+                if not pivot:
+                    continue
+                for f in filings:
+                    if not f.received_date:
+                        continue
+                    if abs((f.received_date - pivot).days) <= self.WINDOW_DAYS:
+                        concurrent.append(
+                            {
+                                "layoff_event_id": event.id,
+                                "layoff_date": pivot.isoformat(),
+                                "lca_case_number": f.case_number,
+                                "lca_received_date": f.received_date.isoformat(),
+                                "soc_code": f.soc_code,
+                                "worksite": (
+                                    f"{f.worksite_city}, {f.worksite_state}"
+                                    if f.worksite_city or f.worksite_state
+                                    else None
+                                ),
+                                "days_between": abs(
+                                    (f.received_date - pivot).days
+                                ),
+                            }
+                        )
+
+            total_workers = sum(
+                int(e.workers_affected) for e in events if e.workers_affected
+            )
+            return {
+                "count": len(events),
+                "total_workers_affected": total_workers,
+                "events": [
+                    {
+                        "source": e.source,
+                        "notice_date": e.notice_date.isoformat() if e.notice_date else None,
+                        "effective_date": e.effective_date.isoformat()
+                        if e.effective_date
+                        else None,
+                        "workers_affected": e.workers_affected,
+                        "location": ", ".join(
+                            p for p in (e.location_city, e.location_state) if p
+                        )
+                        or None,
+                        "reason": e.reason,
+                        "industry": e.industry,
+                        "source_url": e.source_url,
+                    }
+                    for e in events
+                ],
+                "concurrent_filings": concurrent,
+            }
+
+
 class AnomalyFlagConnector(InvestigationConnector):
     name = "anomaly_flags"
 
@@ -290,6 +372,7 @@ CONNECTORS: list[InvestigationConnector] = [
     EntityGraphConnector(),
     AddressVerificationConnector(),
     OpenCorporatesConnector(),
+    LayoffConnector(),
 ]
 
 

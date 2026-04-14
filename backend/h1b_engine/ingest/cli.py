@@ -7,7 +7,16 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from h1b_engine.ingest import bls_oews, geocode, lca, opencorporates, uscis_hub, whd, willful_violators
+from h1b_engine.ingest import (
+    bls_oews,
+    geocode,
+    lca,
+    opencorporates,
+    uscis_hub,
+    warn,
+    whd,
+    willful_violators,
+)
 from h1b_engine.ingest.common import data_dir
 from h1b_engine.utils.logging import setup_logging
 
@@ -134,6 +143,67 @@ def classify_addresses_cmd(
 ) -> None:
     """Alias for `geocode` — kept for parity with the spec's CLI examples."""
     geocode_cmd(limit=limit, only_missing=only_missing)
+
+
+@app.command("warn")
+def warn_cmd(
+    path: Optional[Path] = typer.Option(
+        None, "--path", "-p", help="Single WARN CSV/XLSX file"
+    ),
+    directory: Optional[Path] = typer.Option(
+        None, "--dir", "-d", help="Directory of WARN files (one or more states)"
+    ),
+    state: Optional[str] = typer.Option(
+        None, "--state", "-s", help="2-letter state code for a single-state file"
+    ),
+    source: Optional[str] = typer.Option(
+        None,
+        "--source",
+        help="Source tag override (e.g. LAYOFFS_FYI, WARN_FEDERAL)",
+    ),
+    source_url: Optional[str] = typer.Option(None, "--source-url"),
+) -> None:
+    """Ingest WARN Act mass-layoff notices (state or federal) or Layoffs.fyi CSV.
+
+    Default layout: drop state files in ``data/raw/warn/<state>/*.csv`` and the
+    command will walk the tree, tagging each file with ``WARN_STATE_<XX>``.
+    """
+    files: list[tuple[Path, str | None]] = []
+    if path:
+        files.append((path, state.upper() if state else None))
+    elif directory:
+        for f in sorted(directory.rglob("*.csv")):
+            inferred = state or (f.parent.name.upper() if len(f.parent.name) == 2 else None)
+            files.append((f, inferred))
+        for f in sorted(directory.rglob("*.xlsx")):
+            inferred = state or (f.parent.name.upper() if len(f.parent.name) == 2 else None)
+            files.append((f, inferred))
+    else:
+        base = data_dir() / "raw" / "warn"
+        if not base.exists():
+            console.print(f"[yellow]No WARN files found. Drop files into {base}[/yellow]")
+            raise typer.Exit(1)
+        for f in sorted(base.rglob("*.csv")):
+            inferred = f.parent.name.upper() if len(f.parent.name) == 2 else None
+            files.append((f, inferred))
+        for f in sorted(base.rglob("*.xlsx")):
+            inferred = f.parent.name.upper() if len(f.parent.name) == 2 else None
+            files.append((f, inferred))
+
+    if not files:
+        console.print("[red]No WARN files to ingest[/red]")
+        raise typer.Exit(1)
+
+    total = 0
+    for f, inferred_state in files:
+        console.print(f"[cyan]Ingesting[/cyan] {f.name} (state={inferred_state or '-'})")
+        total += warn.ingest_file(
+            f,
+            source=source,
+            default_state=inferred_state,
+            source_url=source_url,
+        )
+    console.print(f"[green]WARN ingest complete.[/green] {total} layoff events inserted.")
 
 
 @app.command("opencorporates")
