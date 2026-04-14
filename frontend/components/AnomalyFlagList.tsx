@@ -32,11 +32,11 @@ export function AnomalyFlagList({ flags }: { flags: FlagRow[] }) {
             <span className="ml-auto text-xs text-gray-500">{Number(f.flag_score).toFixed(0)} pts</span>
           </div>
           {f.description && <p className="mt-1 text-sm text-gray-700">{f.description}</p>}
-          {f.evidence && (
+          {f.evidence ? (
             <pre className="mt-2 overflow-x-auto rounded bg-gray-50 p-2 text-xs">
               {JSON.stringify(f.evidence, null, 2)}
             </pre>
-          )}
+          ) : null}
         </div>
       ))}
     </div>
