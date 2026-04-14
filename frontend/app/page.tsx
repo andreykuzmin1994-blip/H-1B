@@ -233,6 +233,60 @@ export default async function HomePage() {
           body="Every investigation exports a pre-formatted DOL WH-4 / USCIS tip with the case evidence bundled in."
         />
       </section>
+
+      {/* ---------- GUARDRAILS ---------- */}
+      <section className="rounded-2xl border border-ember-500/30 bg-gradient-to-br from-ember-50/70 to-transparent p-6 md:p-8">
+        <div className="flex flex-wrap items-start gap-6 md:flex-nowrap">
+          <div className="flex-1">
+            <div className="eyebrow">
+              <span className="h-px w-6 bg-ember-500" /> Use responsibly
+            </div>
+            <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-ink-900">
+              A score is a <em>lead</em>, not a verdict.
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-700">
+              Every number on this site comes from public filings, but an anomaly can have an
+              innocent explanation. Always verify against primary sources before naming an
+              employer, filing a complaint, or publishing a story. This tool is about
+              <em> employers and systems</em> &mdash; never about individual workers by name.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href="/methodology" className="btn-outline">
+                Read the methodology →
+              </Link>
+              <a
+                href="https://github.com/andreykuzmin1994-blip/h-1b/issues/new?labels=data-report"
+                target="_blank"
+                rel="noreferrer"
+                className="btn-ghost"
+              >
+                Report a data error
+              </a>
+            </div>
+          </div>
+          <aside className="w-full max-w-xs shrink-0 rounded-xl border border-ink-200 bg-white p-5 shadow-card">
+            <div className="stat-label">What a score is</div>
+            <ul className="mt-3 space-y-2 text-[13px] leading-relaxed text-ink-700">
+              <li>
+                <span className="mr-2 text-lime-600">✓</span>
+                Weighted sum of public-data signals
+              </li>
+              <li>
+                <span className="mr-2 text-lime-600">✓</span>
+                Traceable to the filing that triggered it
+              </li>
+              <li>
+                <span className="mr-2 text-red-600">✗</span>
+                Not a legal finding
+              </li>
+              <li>
+                <span className="mr-2 text-red-600">✗</span>
+                Not a judgment about any individual
+              </li>
+            </ul>
+          </aside>
+        </div>
+      </section>
     </div>
   );
 }

@@ -55,6 +55,23 @@ export default async function TipPage({ params }: { params: { employer_id: strin
         </Link>
       </div>
 
+      <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-5">
+        <div className="flex items-start gap-3">
+          <span aria-hidden className="mt-0.5 text-xl leading-none text-amber-700">⚑</span>
+          <div>
+            <div className="font-semibold text-ink-900">Before you submit this</div>
+            <p className="mt-1 text-sm leading-relaxed text-ink-700">
+              The text below is generated from public records. It is not legal advice and not a
+              verified finding. Read each paragraph, verify the underlying filings on the{' '}
+              <Link href={`/employer/${employer.id}`} className="link">
+                employer dossier
+              </Link>
+              , and only submit if you can stand behind the facts yourself.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <TipSection title="DOL WH-4 complaint" text={tip.dolText} />
       <TipSection title="USCIS tip" text={tip.uscisText} />
 

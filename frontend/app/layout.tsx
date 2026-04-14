@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Fraunces, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import Link from 'next/link';
+import { FreshnessPing } from '@/components/FreshnessPing';
 
 const sans = Inter({
   subsets: ['latin'],
@@ -31,6 +32,7 @@ const NAV = [
   { href: '/map', label: 'Map' },
   { href: '/violators', label: 'Violators' },
   { href: '/layoffs', label: 'Layoffs' },
+  { href: '/methodology', label: 'Methodology' },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -72,6 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               >
                 API
               </Link>
+              <FreshnessPing />
             </nav>
             {/* Mobile compact nav */}
             <nav className="flex items-center gap-1 text-xs md:hidden">
@@ -119,6 +122,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div>
               <div className="stat-label text-ink-700">Take action</div>
               <ul className="mt-3 space-y-1.5 text-sm">
+                <li>
+                  <Link className="link" href="/methodology">
+                    Methodology &amp; limits
+                  </Link>
+                </li>
                 <li>
                   <a
                     className="link"

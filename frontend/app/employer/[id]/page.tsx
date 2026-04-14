@@ -207,10 +207,19 @@ export default async function EmployerPage({ params }: { params: { id: string } 
 
       {/* ---------- FLAGS ---------- */}
       <section>
-        <SectionHeading label="Signals" title="Anomaly flags" />
+        <SectionHeading
+          label="Signals"
+          title="Anomaly flags"
+          sub="Each flag is a public-data signal — not a legal finding. See the methodology for what each flag does and does not prove."
+        />
         <AnomalyFlagList
           flags={employer.flags.map((f) => ({ ...f, flag_score: Number(f.flag_score) }))}
         />
+        <div className="mt-3 text-xs text-ink-500">
+          <Link href="/methodology" className="link">
+            What do these flags mean? →
+          </Link>
+        </div>
       </section>
 
       {/* ---------- WAGE + ADDRESS ---------- */}
