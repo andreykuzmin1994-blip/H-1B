@@ -17,9 +17,13 @@ async function loadEmployer(id: number) {
       filings: { orderBy: { received_date: 'desc' }, take: 100 },
       violations: { orderBy: { violation_date: 'desc' } },
       sos_entities: true,
+      layoff_events: { orderBy: [{ effective_date: 'desc' }, { notice_date: 'desc' }] },
     },
   });
 }
+
+const LAYOFF_WINDOW_DAYS = 90;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function loadGraph(id: number) {
   // 2-hop recursive CTE
@@ -255,6 +259,72 @@ export default async function EmployerPage({ params }: { params: { id: string } 
           </table>
         </div>
       </section>
+
+      {employer.layoff_events.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-lg font-semibold">
+            Layoffs and concurrent H-1B filings
+          </h2>
+          <div className="card space-y-3">
+            <p className="text-sm text-gray-600">
+              WARN Act and supplemental layoff notices. &ldquo;Concurrent H-1B&rdquo; counts LCAs
+              filed within &plusmn;{LAYOFF_WINDOW_DAYS} days of each layoff &mdash; the INA
+              &sect;&nbsp;212(n)(1)(E) non-displacement window that applies to H-1B-dependent
+              employers.
+            </p>
+            {employer.layoff_events.map((l) => {
+              const pivot = l.effective_date ?? l.notice_date;
+              const pivotMs = pivot ? new Date(pivot).getTime() : null;
+              const concurrent = pivotMs
+                ? employer.filings.filter(
+                    (f) =>
+                      f.received_date &&
+                      Math.abs(new Date(f.received_date).getTime() - pivotMs) <=
+                        LAYOFF_WINDOW_DAYS * DAY_MS,
+                  )
+                : [];
+              return (
+                <div
+                  key={l.id}
+                  className={`border-l-4 pl-3 ${
+                    concurrent.length > 0 ? 'border-critical' : 'border-gray-300'
+                  }`}
+                >
+                  <div className="font-semibold">
+                    {l.workers_affected ? l.workers_affected.toLocaleString() : '?'} workers ·{' '}
+                    {[l.location_city, l.location_state].filter(Boolean).join(', ') || '-'}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {l.source} ·{' '}
+                    {l.effective_date
+                      ? `effective ${new Date(l.effective_date).toLocaleDateString()}`
+                      : l.notice_date
+                      ? `noticed ${new Date(l.notice_date).toLocaleDateString()}`
+                      : 'date unknown'}
+                  </div>
+                  {l.reason && <div className="text-sm">Reason: {l.reason}</div>}
+                  {concurrent.length > 0 && (
+                    <div className="mt-1 text-sm font-semibold text-red-700">
+                      {concurrent.length} H-1B LCA{concurrent.length === 1 ? '' : 's'} filed
+                      within ±{LAYOFF_WINDOW_DAYS} days
+                    </div>
+                  )}
+                  {l.source_url && (
+                    <a
+                      className="mt-1 inline-block text-xs text-blue-700 hover:underline"
+                      href={l.source_url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Source notice →
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {employer.violations.length > 0 && (
         <section>

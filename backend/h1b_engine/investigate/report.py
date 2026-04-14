@@ -30,6 +30,7 @@ def generate_report(employer_id: int) -> str:
     graph = data["entity_graph"]
     address = data["address_verification"]
     corp = data["opencorporates"]
+    layoffs = data.get("layoffs", {"count": 0, "events": [], "concurrent_filings": []})
 
     lines: list[str] = []
     lines.append("EMPLOYER INVESTIGATION REPORT")
@@ -171,6 +172,43 @@ def generate_report(employer_id: int) -> str:
                 lines.append(f"  - {o.get('name')} ({o.get('title')})")
     lines.append("")
 
+    # Layoffs and concurrent H-1B filings
+    lines.append(_rule("LAYOFFS AND CONCURRENT H-1B FILINGS"))
+    lines.append("")
+    if layoffs.get("count", 0) == 0:
+        lines.append("No WARN Act layoff notices on record for this employer.")
+    else:
+        lines.append(
+            f"WARN / layoff notices on file: {layoffs['count']} "
+            f"({layoffs.get('total_workers_affected', 0):,} US workers affected)"
+        )
+        for ev in layoffs["events"][:10]:
+            lines.append(
+                f"- [{ev['source']}] "
+                f"effective {ev['effective_date'] or ev['notice_date'] or '-'} "
+                f"| {ev.get('workers_affected') or '-'} workers"
+                f" | {ev.get('location') or '-'}"
+            )
+            if ev.get("reason"):
+                lines.append(f"    reason: {ev['reason']}")
+        concurrent = layoffs.get("concurrent_filings", [])
+        if concurrent:
+            lines.append("")
+            lines.append(
+                f"H-1B LCAs filed within +/-90 days of a layoff: {len(concurrent)}"
+            )
+            lines.append(
+                "  (INA section 212(n)(1)(E) non-displacement window for "
+                "H-1B-dependent employers)"
+            )
+            for c in concurrent[:10]:
+                lines.append(
+                    f"  - LCA {c['lca_case_number']} filed {c['lca_received_date']} "
+                    f"(SOC {c['soc_code'] or '-'}, {c['worksite'] or '-'}) "
+                    f"— {c['days_between']} days from layoff"
+                )
+    lines.append("")
+
     # Address
     lines.append(_rule("ADDRESS VERIFICATION"))
     lines.append("")
@@ -215,6 +253,21 @@ def _recommendations(flags, lca, wages, violations) -> list[str]:
         recs.append("Continued filing activity after prior enforcement action")
     if "HIGH_DENIAL_RATE" in flag_types:
         recs.append("High USCIS denial rate relative to peer employers in same SOC")
+    if "LAYOFF_WITH_CONCURRENT_H1B" in flag_types:
+        recs.append(
+            "H-1B filing inside INA section 212(n)(1)(E) 90-day "
+            "non-displacement window around a WARN Act layoff notice"
+        )
+    if "LAYOFF_SAME_WORKSITE_H1B" in flag_types:
+        recs.append(
+            "H-1B worksite matches the geographic location of a concurrent "
+            "US-worker layoff"
+        )
+    if "LAYOFF_SAME_SOC_H1B" in flag_types:
+        recs.append(
+            "H-1B occupation overlaps the job family affected by the "
+            "concurrent layoff"
+        )
     return recs
 
 
@@ -243,6 +296,57 @@ def tip_text(employer_id: int, data: dict[str, Any] | None = None) -> str:
     for f in data.get("anomaly_flags", {}).get("flags", []):
         parts.append(f"  - {f['type']}: {f['description']}")
     parts.append("")
+
+    # Layoff + concurrent H-1B filing evidence package (INA 212(n)(1)(E)).
+    layoffs = data.get("layoffs", {})
+    concurrent = layoffs.get("concurrent_filings", []) if layoffs else []
+    if concurrent:
+        parts.append("=== INA 212(n)(1)(E) DISPLACEMENT COMPLAINT ===")
+        parts.append(
+            "Under 8 U.S.C. section 1182(n)(1)(E), an H-1B-dependent employer "
+            "may not displace a US worker employed by the employer within "
+            "the period beginning 90 days before and ending 90 days after "
+            "the date of filing of any visa petition supported by the "
+            "application. The public record below is consistent with a "
+            "violation of this non-displacement attestation:"
+        )
+        parts.append("")
+        parts.append(f"Employer: {emp.name}")
+        total_workers = layoffs.get("total_workers_affected") or 0
+        parts.append(
+            f"WARN notices on record: {layoffs.get('count', 0)} "
+            f"({total_workers:,} US workers affected)"
+        )
+        parts.append(
+            f"H-1B LCAs filed inside the 90-day window: {len(concurrent)}"
+        )
+        parts.append("")
+        parts.append("Evidence package (public-data citations):")
+        for ev in layoffs.get("events", [])[:5]:
+            parts.append(
+                f"  - {ev['source']}: effective "
+                f"{ev['effective_date'] or ev['notice_date']}, "
+                f"{ev.get('workers_affected') or '?'} workers, "
+                f"{ev.get('location') or '-'}"
+            )
+            if ev.get("source_url"):
+                parts.append(f"      {ev['source_url']}")
+        for c in concurrent[:10]:
+            parts.append(
+                f"  - LCA {c['lca_case_number']} filed {c['lca_received_date']} "
+                f"(SOC {c['soc_code'] or '-'}, {c['worksite'] or '-'}); "
+                f"{c['days_between']} days from layoff"
+            )
+        parts.append("")
+        parts.append(
+            "Requested action: investigate whether the employer is H-1B-"
+            "dependent (per 20 CFR 655.736), and, if so, whether the "
+            "laid-off US workers held positions that are essentially "
+            "equivalent to those of the H-1B workers whose LCAs are listed "
+            "above (per 20 CFR 655.738)."
+        )
+        parts.append("")
+
     parts.append("=== USCIS TIP TEXT ===")
     parts.append(
         "I am submitting this tip based on publicly available DOL / USCIS / BLS "

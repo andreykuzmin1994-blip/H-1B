@@ -91,6 +91,65 @@ ANOMALY_FLAGS: dict[str, FlagDefinition] = {
         score=18,
         description="Entity shares address/agent/officer with a known violator",
     ),
+    "LAYOFF_WITH_CONCURRENT_H1B": FlagDefinition(
+        type="LAYOFF_WITH_CONCURRENT_H1B",
+        severity="CRITICAL",
+        score=40,
+        description=(
+            "Employer filed an H-1B LCA within the INA 212(n)(1)(E) 90-day "
+            "non-displacement window around a WARN Act mass-layoff notice"
+        ),
+    ),
+    "LAYOFF_SAME_WORKSITE_H1B": FlagDefinition(
+        type="LAYOFF_SAME_WORKSITE_H1B",
+        severity="CRITICAL",
+        score=35,
+        description=(
+            "Concurrent H-1B filing lists the same worksite city/state as the "
+            "layoff notice"
+        ),
+    ),
+    "LAYOFF_SAME_SOC_H1B": FlagDefinition(
+        type="LAYOFF_SAME_SOC_H1B",
+        severity="HIGH",
+        score=25,
+        description=(
+            "Concurrent H-1B filing's SOC major group matches the layoff's "
+            "industry/reason signal"
+        ),
+    ),
+}
+
+# 90-day non-displacement window from INA section 212(n)(1)(E).
+LAYOFF_WINDOW_DAYS: int = 90
+
+# Rough industry/reason-token to SOC major-group map used to detect
+# "laid off engineers while filing engineer H-1Bs" patterns. Kept intentionally
+# conservative: we only produce the flag when a reasonably specific signal
+# overlaps the concurrent LCA's SOC major group.
+LAYOFF_REASON_SOC_HINTS: dict[str, set[str]] = {
+    "software": {"15"},
+    "engineer": {"15", "17"},
+    "engineering": {"15", "17"},
+    "developer": {"15"},
+    "technology": {"15"},
+    "tech": {"15"},
+    "it": {"15"},
+    "data": {"15"},
+    "cloud": {"15"},
+    "computer": {"15"},
+    "information": {"15"},
+    "finance": {"13"},
+    "financial": {"13"},
+    "accounting": {"13"},
+    "marketing": {"11", "13"},
+    "sales": {"41"},
+    "operations": {"11", "43"},
+    "manufacturing": {"51"},
+    "production": {"51"},
+    "warehouse": {"53"},
+    "logistics": {"53"},
+    "research": {"19"},
 }
 
 # Hard-flag NAICS prefix + SOC major-group combinations

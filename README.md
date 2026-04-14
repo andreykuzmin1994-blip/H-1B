@@ -49,6 +49,8 @@ python scripts/ingest.py uscis-hub --fiscal-year 2024
 python scripts/ingest.py whd-enforcement
 python scripts/ingest.py violators
 python scripts/ingest.py bls-oews --year 2024
+# WARN Act mass-layoff notices (state CSVs under data/raw/warn/<XX>/, or a single file)
+python scripts/ingest.py warn
 
 # Sprint 2: score
 python scripts/score.py run

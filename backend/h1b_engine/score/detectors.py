@@ -13,6 +13,7 @@ from h1b_engine.db.models import (
     AnomalyFlag,
     Employer,
     EntityRelationship,
+    LayoffEvent,
     LcaFiling,
     SocWageBenchmark,
     SosEntity,
@@ -23,6 +24,8 @@ from h1b_engine.graph.builder import subgraph_for_employer
 from h1b_engine.score.flags import (
     ANOMALY_FLAGS,
     BUSINESS_PARK_KEYWORDS,
+    LAYOFF_REASON_SOC_HINTS,
+    LAYOFF_WINDOW_DAYS,
     NAICS_SOC_HARD_RULES,
     NON_SPECIALTY_SOCS,
     RELATIONSHIP_WEIGHTS,
@@ -390,6 +393,14 @@ def detect_for_employer(
             )
             break
 
+    # -- LAYOFF_WITH_CONCURRENT_H1B -----------------------------------------
+    # INA section 212(n)(1)(E) prohibits H-1B-dependent employers from
+    # displacing US workers within 90 days before or after filing. We flag any
+    # LCA filed inside that window around a WARN notice for the same employer,
+    # and escalate when the worksite or SOC family overlap.
+    layoff_outputs = detect_layoffs_with_concurrent_h1b(session, employer, filings)
+    outputs.extend(layoff_outputs)
+
     # -- CONNECTED_TO_VIOLATOR ----------------------------------------------
     if violator_ids and employer.id not in violator_ids:
         graph = subgraph_for_employer(employer.id, max_depth=2)
@@ -425,6 +436,156 @@ def detect_for_employer(
                 )
                 break
 
+    return outputs
+
+
+def _soc_hints_for_reason(text: str | None) -> set[str]:
+    """Return candidate SOC major groups implied by a WARN reason/industry string."""
+    if not text:
+        return set()
+    tokens = text.lower()
+    hints: set[str] = set()
+    for keyword, major_groups in LAYOFF_REASON_SOC_HINTS.items():
+        if keyword in tokens:
+            hints.update(major_groups)
+    return hints
+
+
+def detect_layoffs_with_concurrent_h1b(
+    session: Session,
+    employer: Employer,
+    filings: list[LcaFiling],
+) -> list[FlagOutput]:
+    """Flag employers filing LCAs inside the 90-day non-displacement window.
+
+    Emits up to three stacking flags per employer (most severe first):
+
+    * ``LAYOFF_WITH_CONCURRENT_H1B`` — any LCA within +/- 90 days of the
+      layoff's effective date.
+    * ``LAYOFF_SAME_WORKSITE_H1B`` — concurrent LCA's worksite matches the
+      layoff city+state.
+    * ``LAYOFF_SAME_SOC_H1B`` — concurrent LCA's SOC major group matches a
+      hint inferred from the layoff's reason/industry text.
+    """
+    outputs: list[FlagOutput] = []
+    if not filings:
+        return outputs
+
+    layoffs = session.execute(
+        select(LayoffEvent).where(LayoffEvent.employer_id == employer.id)
+    ).scalars().all()
+    if not layoffs:
+        return outputs
+
+    window = timedelta(days=LAYOFF_WINDOW_DAYS)
+
+    concurrent_evidence: dict[str, Any] | None = None
+    same_worksite_evidence: dict[str, Any] | None = None
+    same_soc_evidence: dict[str, Any] | None = None
+    concurrent_lca_id: int | None = None
+
+    for layoff in layoffs:
+        pivot = layoff.effective_date or layoff.notice_date
+        if not pivot:
+            continue
+        layoff_city = (layoff.location_city or "").strip().upper()
+        layoff_state = (layoff.location_state or "").strip().upper()
+        soc_hints = _soc_hints_for_reason(
+            " ".join(filter(None, [layoff.reason, layoff.industry]))
+        )
+
+        for filing in filings:
+            if not filing.received_date:
+                continue
+            delta = abs((filing.received_date - pivot).days)
+            if delta > LAYOFF_WINDOW_DAYS:
+                continue
+
+            # Base concurrency evidence — keep the tightest (smallest delta) hit.
+            base_payload = {
+                "layoff_event_id": layoff.id,
+                "layoff_effective_date": pivot.isoformat(),
+                "layoff_workers_affected": layoff.workers_affected,
+                "layoff_source": layoff.source,
+                "lca_case_number": filing.case_number,
+                "lca_received_date": filing.received_date.isoformat(),
+                "lca_soc_code": filing.soc_code,
+                "days_between": delta,
+                "direction": (
+                    "before_layoff"
+                    if filing.received_date < pivot
+                    else "after_layoff"
+                    if filing.received_date > pivot
+                    else "same_day"
+                ),
+            }
+            if (
+                concurrent_evidence is None
+                or delta < concurrent_evidence["days_between"]
+            ):
+                concurrent_evidence = base_payload
+                concurrent_lca_id = filing.id
+
+            # Same-worksite escalation.
+            filing_city = (filing.worksite_city or "").strip().upper()
+            filing_state = (filing.worksite_state or "").strip().upper()
+            if (
+                layoff_city
+                and layoff_state
+                and filing_city == layoff_city
+                and filing_state == layoff_state
+            ):
+                payload = {
+                    **base_payload,
+                    "worksite_city": filing.worksite_city,
+                    "worksite_state": filing.worksite_state,
+                }
+                if (
+                    same_worksite_evidence is None
+                    or delta < same_worksite_evidence["days_between"]
+                ):
+                    same_worksite_evidence = payload
+
+            # Same-SOC-family escalation.
+            if soc_hints and filing.soc_code:
+                soc_major = (
+                    filing.soc_code.split("-")[0]
+                    if "-" in filing.soc_code
+                    else filing.soc_code[:2]
+                )
+                if soc_major in soc_hints:
+                    payload = {
+                        **base_payload,
+                        "soc_major": soc_major,
+                        "layoff_reason": layoff.reason,
+                        "layoff_industry": layoff.industry,
+                    }
+                    if (
+                        same_soc_evidence is None
+                        or delta < same_soc_evidence["days_between"]
+                    ):
+                        same_soc_evidence = payload
+
+    if concurrent_evidence is not None:
+        outputs.append(
+            (
+                ANOMALY_FLAGS["LAYOFF_WITH_CONCURRENT_H1B"],
+                concurrent_evidence,
+                concurrent_lca_id,
+            )
+        )
+    if same_worksite_evidence is not None:
+        outputs.append(
+            (
+                ANOMALY_FLAGS["LAYOFF_SAME_WORKSITE_H1B"],
+                same_worksite_evidence,
+                None,
+            )
+        )
+    if same_soc_evidence is not None:
+        outputs.append(
+            (ANOMALY_FLAGS["LAYOFF_SAME_SOC_H1B"], same_soc_evidence, None)
+        )
     return outputs
 
 

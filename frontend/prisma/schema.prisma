@@ -36,6 +36,7 @@ model Employer {
   flags         AnomalyFlag[]
   uscis_stats   UscisEmployerStats[]
   sos_entities  SosEntity[]
+  layoff_events LayoffEvent[]
 
   @@unique([name_normalized, state])
   @@index([name_normalized])
@@ -176,6 +177,33 @@ model SosEntity {
 
   @@index([employer_id])
   @@map("sos_entities")
+}
+
+model LayoffEvent {
+  id                 Int       @id @default(autoincrement())
+  employer_id        Int?
+  employer_name_raw  String?   @db.VarChar(500)
+  source             String    @db.VarChar(30)
+  notice_date        DateTime? @db.Date
+  effective_date     DateTime? @db.Date
+  workers_affected   Int?
+  location_city      String?   @db.VarChar(200)
+  location_state     String?   @db.VarChar(2)
+  location_zip       String?   @db.VarChar(10)
+  reason             String?   @db.VarChar(200)
+  industry           String?   @db.VarChar(200)
+  source_url         String?   @db.VarChar(1000)
+  external_id        String?   @db.VarChar(200)
+  raw                Json?
+  created_at         DateTime  @default(now())
+
+  employer Employer? @relation(fields: [employer_id], references: [id], onDelete: SetNull)
+
+  @@unique([source, external_id], name: "uq_layoff_source_extid")
+  @@index([employer_id])
+  @@index([effective_date])
+  @@index([location_state, location_city])
+  @@map("layoff_events")
 }
 
 model SocWageBenchmark {
