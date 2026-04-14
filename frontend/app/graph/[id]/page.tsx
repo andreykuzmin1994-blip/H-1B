@@ -60,8 +60,17 @@ export default async function GraphPage({ params }: { params: { id: string } }) 
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold">Entity relationship explorer</h1>
+    <div className="space-y-8">
+      <div className="page-header">
+        <div className="eyebrow">
+          <span className="h-px w-6 bg-ember-500" /> Network
+        </div>
+        <h1>Entity relationship explorer.</h1>
+        <p>
+          Two-hop graph of employers linked by shared officers, addresses, or trade-name aliases.
+          Red nodes have a documented enforcement outcome.
+        </p>
+      </div>
       <div className="card">
         <EntityGraph graph={graph} centerId={id} />
       </div>

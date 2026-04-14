@@ -75,9 +75,9 @@ export function AnomalyHeatmap({ points }: { points: Point[] }) {
   }, [points]);
 
   return (
-    <div className="card">
+    <div className="p-4">
       <svg ref={svgRef} style={{ width: '100%', height: 480 }} />
-      <p className="mt-2 text-xs text-gray-500">{points.length} employers shown</p>
+      <p className="mt-2 text-xs text-ink-500">{points.length} employers shown</p>
     </div>
   );
 }
