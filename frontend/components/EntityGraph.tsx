@@ -114,8 +114,37 @@ export function EntityGraph({
   }, [data, centerId]);
 
   if (data.nodes.length === 0) {
-    return <p className="text-sm text-gray-500">No entity relationships on file.</p>;
+    return (
+      <div className="rounded-lg border border-dashed border-ink-200 bg-white/60 p-6 text-center text-sm text-ink-500">
+        No entity relationships on file. Run{' '}
+        <code className="rounded bg-ink-100 px-1.5 py-0.5 text-xs">python scripts/graph.py build-all</code>{' '}
+        to resolve officer and address links.
+      </div>
+    );
   }
 
-  return <svg ref={svgRef} style={{ width: '100%', height: 360 }} />;
+  return (
+    <div className="space-y-3">
+      <svg ref={svgRef} style={{ width: '100%', height: 360 }} />
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-500">
+        <LegendDot color="#0ea5e9" label="Centered employer" />
+        <LegendDot color="#dc2626" label="Violator" />
+        <LegendDot color="#f97316" label="High score (50+)" />
+        <LegendDot color="#eab308" label="Medium (25–49)" />
+        <LegendDot color="#a3e635" label="Low / clean" />
+      </div>
+    </div>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className="inline-block h-2.5 w-2.5 rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      {label}
+    </span>
+  );
 }
