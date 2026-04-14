@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: h1b_postgres
+    environment:
+      POSTGRES_USER: h1b
+      POSTGRES_PASSWORD: h1b
+      POSTGRES_DB: h1b_engine
+    ports:
+      - "5432:5432"
+    volumes:
+      - h1b_pgdata:/var/lib/postgresql/data
+
+volumes:
+  h1b_pgdata:
