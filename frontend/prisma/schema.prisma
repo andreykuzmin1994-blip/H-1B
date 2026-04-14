@@ -1,0 +1,201 @@
+// Prisma schema mirrors the SQLAlchemy schema in backend/h1b_engine/db/models.py
+// Run `prisma db pull` if you want to regenerate from the live DB.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Employer {
+  id                     Int       @id @default(autoincrement())
+  ein                    String?   @db.VarChar(20)
+  name                   String    @db.VarChar(500)
+  name_normalized        String    @db.VarChar(500)
+  address_line1          String?   @db.VarChar(500)
+  city                   String?   @db.VarChar(200)
+  state                  String?   @db.VarChar(2)
+  zip                    String?   @db.VarChar(10)
+  naics_code             String?   @db.VarChar(6)
+  industry_description   String?   @db.VarChar(500)
+  address_type           String?   @db.VarChar(20)
+  address_geocoded_lat   Decimal?  @db.Decimal(10, 7)
+  address_geocoded_lng   Decimal?  @db.Decimal(10, 7)
+  first_filing_date      DateTime? @db.Date
+  last_filing_date       DateTime? @db.Date
+  total_lca_count        Int       @default(0)
+  anomaly_score          Decimal   @default(0) @db.Decimal(5, 2)
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @default(now())
+
+  filings       LcaFiling[]
+  violations    Violation[]
+  flags         AnomalyFlag[]
+  uscis_stats   UscisEmployerStats[]
+  sos_entities  SosEntity[]
+
+  @@unique([name_normalized, state])
+  @@index([name_normalized])
+  @@index([address_line1, city, state])
+  @@index([naics_code])
+  @@index([anomaly_score])
+  @@map("employers")
+}
+
+model LcaFiling {
+  id                  Int       @id @default(autoincrement())
+  case_number         String    @unique @db.VarChar(50)
+  case_status         String?   @db.VarChar(20)
+  employer_id         Int?
+  employer_name_raw   String?   @db.VarChar(500)
+  naics_code          String?   @db.VarChar(6)
+  soc_code            String?   @db.VarChar(10)
+  soc_title           String?   @db.VarChar(500)
+  job_title           String?   @db.VarChar(500)
+  wage_from           Decimal?  @db.Decimal(12, 2)
+  wage_unit           String?   @db.VarChar(20)
+  wage_annualized     Decimal?  @db.Decimal(12, 2)
+  prevailing_wage     Decimal?  @db.Decimal(12, 2)
+  pw_unit             String?   @db.VarChar(20)
+  pw_annualized       Decimal?  @db.Decimal(12, 2)
+  wage_ratio          Decimal?  @db.Decimal(5, 3)
+  worksite_city       String?   @db.VarChar(200)
+  worksite_state      String?   @db.VarChar(2)
+  worksite_zip        String?   @db.VarChar(10)
+  secondary_entity    String?   @db.VarChar(500)
+  total_workers       Int?
+  visa_class          String?   @db.VarChar(10)
+  received_date       DateTime? @db.Date
+  decision_date       DateTime? @db.Date
+  fiscal_year         Int?
+  created_at          DateTime  @default(now())
+
+  employer Employer? @relation(fields: [employer_id], references: [id], onDelete: SetNull)
+
+  @@index([employer_id])
+  @@index([soc_code])
+  @@index([fiscal_year])
+  @@index([case_status])
+  @@map("lca_filings")
+}
+
+model UscisEmployerStats {
+  id                     Int      @id @default(autoincrement())
+  employer_id            Int?
+  employer_name_raw      String?  @db.VarChar(500)
+  tax_id_last4           String?  @db.VarChar(4)
+  fiscal_year            Int
+  initial_approvals      Int      @default(0)
+  initial_denials        Int      @default(0)
+  continuing_approvals   Int      @default(0)
+  continuing_denials     Int      @default(0)
+  city                   String?  @db.VarChar(200)
+  state                  String?  @db.VarChar(2)
+  zip                    String?  @db.VarChar(10)
+  naics_code             String?  @db.VarChar(6)
+  created_at             DateTime @default(now())
+
+  employer Employer? @relation(fields: [employer_id], references: [id], onDelete: SetNull)
+
+  @@index([employer_id])
+  @@map("uscis_employer_stats")
+}
+
+model Violation {
+  id                 Int       @id @default(autoincrement())
+  employer_id        Int?
+  employer_name_raw  String?   @db.VarChar(500)
+  source             String    @db.VarChar(50)
+  violation_type     String?   @db.VarChar(200)
+  violation_date     DateTime? @db.Date
+  debarment_start    DateTime? @db.Date
+  debarment_end      DateTime? @db.Date
+  back_wages_amount  Decimal?  @db.Decimal(12, 2)
+  penalty_amount     Decimal?  @db.Decimal(12, 2)
+  description        String?   @db.Text
+  source_url         String?   @db.VarChar(1000)
+  created_at         DateTime  @default(now())
+
+  employer Employer? @relation(fields: [employer_id], references: [id], onDelete: SetNull)
+
+  @@index([employer_id])
+  @@map("violations")
+}
+
+model AnomalyFlag {
+  id             Int      @id @default(autoincrement())
+  employer_id    Int?
+  lca_filing_id  Int?
+  flag_type      String   @db.VarChar(50)
+  flag_severity  String?  @db.VarChar(10)
+  flag_score     Decimal  @default(0) @db.Decimal(5, 2)
+  description    String?  @db.Text
+  evidence       Json?
+  created_at     DateTime @default(now())
+
+  employer Employer? @relation(fields: [employer_id], references: [id], onDelete: Cascade)
+
+  @@index([employer_id])
+  @@index([flag_type])
+  @@map("anomaly_flags")
+}
+
+model EntityRelationship {
+  id                 Int      @id @default(autoincrement())
+  employer_id_a      Int
+  employer_id_b      Int
+  relationship_type  String   @db.VarChar(50)
+  confidence         Decimal  @default(1.0) @db.Decimal(3, 2)
+  evidence           Json?
+  created_at         DateTime @default(now())
+
+  @@unique([employer_id_a, employer_id_b, relationship_type])
+  @@index([employer_id_a])
+  @@index([employer_id_b])
+  @@map("entity_relationships")
+}
+
+model SosEntity {
+  id                Int       @id @default(autoincrement())
+  employer_id       Int?
+  state             String?   @db.VarChar(2)
+  entity_name       String?   @db.VarChar(500)
+  entity_type       String?   @db.VarChar(50)
+  formation_date    DateTime? @db.Date
+  status            String?   @db.VarChar(50)
+  registered_agent  String?   @db.VarChar(500)
+  principal_address String?   @db.VarChar(500)
+  officers          Json?
+  source_url        String?   @db.VarChar(1000)
+  fetched_at        DateTime  @default(now())
+
+  employer Employer? @relation(fields: [employer_id], references: [id], onDelete: SetNull)
+
+  @@index([employer_id])
+  @@map("sos_entities")
+}
+
+model SocWageBenchmark {
+  id                  Int      @id @default(autoincrement())
+  soc_code            String   @db.VarChar(10)
+  soc_title           String?  @db.VarChar(500)
+  oews_year           Int
+  area_type           String   @db.VarChar(20)
+  area_code           String?  @db.VarChar(10)
+  area_name           String?  @db.VarChar(200)
+  employment          Int?
+  mean_annual_wage    Decimal? @db.Decimal(12, 2)
+  median_annual_wage  Decimal? @db.Decimal(12, 2)
+  pct10_annual_wage   Decimal? @db.Decimal(12, 2)
+  pct25_annual_wage   Decimal? @db.Decimal(12, 2)
+  pct75_annual_wage   Decimal? @db.Decimal(12, 2)
+  pct90_annual_wage   Decimal? @db.Decimal(12, 2)
+  created_at          DateTime @default(now())
+
+  @@unique([soc_code, oews_year, area_type, area_code])
+  @@index([soc_code, oews_year, area_type])
+  @@map("soc_wage_benchmarks")
+}
