@@ -60,47 +60,44 @@ export default async function LayoffsPage() {
   const redFlagCount = layoffs.filter((l) => concurrentCount(l) > 0).length;
 
   return (
-    <div className="space-y-8">
-      <div className="page-header">
-        <div className="eyebrow">
-          <span className="h-px w-6 bg-ember-500" /> Displacement watch
+    <div className="space-y-10">
+      <header className="md:grid md:grid-cols-12 md:gap-10">
+        <div className="md:col-span-8">
+          <div className="dateline">Displacement watch</div>
+          <h1 className="mt-3 font-serif">
+            Who laid off workers, then filed H-1B petitions.
+          </h1>
+          <p className="mt-3 max-w-[65ch] text-[15px] leading-[1.55] text-ink-700">
+            Mass-layoff notices from federal and state WARN Act filings, joined against each
+            employer&rsquo;s H-1B LCA history. The <em>Concurrent</em> column counts LCAs filed
+            within ±{WINDOW_DAYS} days of the layoff &mdash; the INA §212(n)(1)(E) non-displacement
+            window for H-1B-dependent employers.
+          </p>
         </div>
-        <h1>Who laid off workers &mdash; then filed H-1B petitions?</h1>
-        <p>
-          Mass-layoff notices from federal and state WARN Act filings joined against each
-          employer&rsquo;s H-1B LCA history. The <em>Concurrent H-1B</em> column counts LCAs filed
-          within <strong>±{WINDOW_DAYS} days</strong> of the layoff &mdash; the INA &sect;&nbsp;212(n)(1)(E)
-          non-displacement window that applies to H-1B-dependent employers.
-        </p>
-      </div>
+        <aside className="mt-8 md:col-span-4 md:mt-0">
+          <div className="border-t-2 border-ink-900 pt-3">
+            <dl className="space-y-3 text-sm">
+              <SidebarStat label="Layoff events" value={layoffs.length.toLocaleString()} />
+              <SidebarStat label="Workers affected" value={totalWorkers.toLocaleString()} />
+              <SidebarStat
+                label="With concurrent H-1B"
+                value={redFlagCount.toString()}
+                accent
+              />
+            </dl>
+          </div>
+        </aside>
+      </header>
 
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="stat stat-accent">
-          <div className="stat-label">Layoff events</div>
-          <div className="stat-value">{layoffs.length.toLocaleString()}</div>
-          <div className="stat-sub">Most recent 200 WARN filings</div>
-        </div>
-        <div className="stat stat-accent">
-          <div className="stat-label">Workers affected</div>
-          <div className="stat-value">{totalWorkers.toLocaleString()}</div>
-          <div className="stat-sub">Across all events shown</div>
-        </div>
-        <div className="stat stat-accent">
-          <div className="stat-label">With concurrent H-1B filings</div>
-          <div className="stat-value text-ember-600">{redFlagCount}</div>
-          <div className="stat-sub">Within ±{WINDOW_DAYS} days of the layoff</div>
-        </div>
-      </section>
-
-      <div className="overflow-hidden rounded-xl border border-ink-200 bg-white shadow-card">
-        <table className="data-table">
+      <div className="overflow-x-auto">
+        <table className="ledger">
           <thead>
             <tr>
               <th>Employer</th>
               <th>Location</th>
               <th>Effective</th>
               <th className="text-right">Workers</th>
-              <th className="text-right">Concurrent H-1B</th>
+              <th className="text-right">Concurrent</th>
               <th>Source</th>
             </tr>
           </thead>
@@ -108,23 +105,20 @@ export default async function LayoffsPage() {
             {layoffs.map((l) => {
               const concurrent = concurrentCount(l);
               return (
-                <tr key={l.id} className={concurrent > 0 ? 'bg-red-50/40' : undefined}>
+                <tr key={l.id}>
                   <td>
                     {l.employer ? (
-                      <Link
-                        className="font-medium text-ink-900 hover:text-ember-600"
-                        href={`/employer/${l.employer.id}`}
-                      >
+                      <Link href={`/employer/${l.employer.id}`} className="link">
                         {l.employer.name}
                       </Link>
                     ) : (
-                      <span className="text-ink-700">{l.employer_name_raw}</span>
+                      <span className="text-ink-800">{l.employer_name_raw}</span>
                     )}
                   </td>
-                  <td className="text-ink-600">
+                  <td className="text-ink-700">
                     {[l.location_city, l.location_state].filter(Boolean).join(', ') || '—'}
                   </td>
-                  <td className="num text-ink-600">
+                  <td className="num">
                     {l.effective_date
                       ? new Date(l.effective_date).toLocaleDateString()
                       : l.notice_date
@@ -136,27 +130,20 @@ export default async function LayoffsPage() {
                   </td>
                   <td
                     className={`num text-right ${
-                      concurrent > 0 ? 'font-semibold text-red-700' : 'text-ink-400'
+                      concurrent > 0 ? 'font-semibold text-accent' : 'text-ink-400'
                     }`}
                   >
-                    {concurrent > 0 ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="severity-dot bg-red-600 animate-pulseDot" />
-                        {concurrent}
-                      </span>
-                    ) : (
-                      '0'
-                    )}
+                    {concurrent}
                   </td>
                   <td>
                     {l.source_url ? (
                       <a
-                        className="font-mono text-[11px] uppercase tracking-wider text-ink-700 hover:text-ember-600"
+                        className="font-mono text-[11px] uppercase tracking-wider text-ink-700 hover:text-accent"
                         href={l.source_url}
                         rel="noreferrer"
                         target="_blank"
                       >
-                        {l.source} ↗
+                        {l.source}
                       </a>
                     ) : (
                       <span className="font-mono text-[11px] uppercase tracking-wider text-ink-600">
@@ -170,21 +157,37 @@ export default async function LayoffsPage() {
             {layoffs.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-10 text-center text-sm text-ink-500">
-                  No WARN / layoff notices ingested yet. Run{' '}
-                  <code className="rounded bg-ink-100 px-1.5 py-0.5 text-xs">
-                    python scripts/ingest.py warn
-                  </code>{' '}
-                  with state WARN CSVs in{' '}
-                  <code className="rounded bg-ink-100 px-1.5 py-0.5 text-xs">
-                    data/raw/warn/&lt;state&gt;/
-                  </code>
-                  .
+                  No WARN notices ingested yet. Run{' '}
+                  <code className="font-mono text-xs">python scripts/ingest.py warn</code>.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function SidebarStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between border-b border-ink-100 pb-1.5">
+      <dt className="text-ink-600">{label}</dt>
+      <dd
+        className={`font-mono text-sm tabular ${
+          accent ? 'text-accent' : 'text-ink-900'
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

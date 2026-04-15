@@ -28,7 +28,9 @@ export function AnomalyHeatmap({ points }: { points: Point[] }) {
         .attr('x', width / 2)
         .attr('y', height / 2)
         .attr('text-anchor', 'middle')
-        .attr('fill', '#9ca3af')
+        .attr('fill', '#8a867c')
+        .attr('font-family', 'Source Serif 4, Georgia, serif')
+        .attr('font-size', 16)
         .text('No geocoded employers yet.');
       return;
     }
@@ -41,7 +43,7 @@ export function AnomalyHeatmap({ points }: { points: Point[] }) {
     const radius = d3
       .scaleSqrt()
       .domain([0, d3.max(points, (p) => p.score) ?? 100])
-      .range([2, 18]);
+      .range([2, 16]);
 
     svg
       .append('g')
@@ -59,13 +61,13 @@ export function AnomalyHeatmap({ points }: { points: Point[] }) {
       })
       .attr('r', (p) => radius(p.score))
       .attr('fill', (p) => {
-        if (p.score >= 75) return '#b91c1c';
-        if (p.score >= 50) return '#ea580c';
-        if (p.score >= 25) return '#eab308';
-        return '#84cc16';
+        if (p.score >= 75) return '#7a1616';
+        if (p.score >= 50) return '#b06427';
+        if (p.score >= 25) return '#9a8a26';
+        return '#6a8a52';
       })
-      .attr('fill-opacity', 0.6)
-      .attr('stroke', '#111827')
+      .attr('fill-opacity', 0.55)
+      .attr('stroke', '#111111')
       .attr('stroke-width', 0.4)
       .on('click', (_evt, d) => {
         window.location.href = `/employer/${d.id}`;
@@ -74,10 +76,5 @@ export function AnomalyHeatmap({ points }: { points: Point[] }) {
       .text((p) => `${p.name} (${p.state}) · score ${p.score.toFixed(0)}`);
   }, [points]);
 
-  return (
-    <div className="p-4">
-      <svg ref={svgRef} style={{ width: '100%', height: 480 }} />
-      <p className="mt-2 text-xs text-ink-500">{points.length} employers shown</p>
-    </div>
-  );
+  return <svg ref={svgRef} style={{ width: '100%', height: 480 }} />;
 }

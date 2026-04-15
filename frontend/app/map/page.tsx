@@ -22,27 +22,25 @@ export default async function MapPage() {
   });
 
   return (
-    <div className="space-y-8">
-      <div className="page-header">
-        <div className="eyebrow">
-          <span className="h-px w-6 bg-ember-500" /> Geography of risk
-        </div>
-        <h1>Anomaly heatmap.</h1>
-        <p>
+    <div className="space-y-10">
+      <header>
+        <div className="dateline">Geography of risk</div>
+        <h1 className="mt-3 font-serif">Anomaly heatmap.</h1>
+        <p className="mt-3 max-w-[65ch] text-[15px] leading-[1.55] text-ink-700">
           Every dot is an employer with an anomaly score of at least 25. Color and radius scale
-          with severity. Click a marker to open its investigation.
+          with severity. Click a marker to open its dossier.
         </p>
-      </div>
+        <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm text-ink-700">
+          <Legend mark="mark-critical" label="Critical (75+)" />
+          <Legend mark="mark-high" label="High (50–74)" />
+          <Legend mark="mark-medium" label="Medium (25–49)" />
+          <span className="font-mono text-[11px] uppercase tracking-wider text-ink-500">
+            {rows.length.toLocaleString()} points
+          </span>
+        </div>
+      </header>
 
-      <div className="flex flex-wrap gap-3 text-xs text-ink-600">
-        <LegendSwatch color="bg-red-600" label="Critical (75+)" />
-        <LegendSwatch color="bg-orange-500" label="High (50–74)" />
-        <LegendSwatch color="bg-amber-500" label="Medium (25–49)" />
-        <span className="text-ink-400">·</span>
-        <span>{rows.length.toLocaleString()} points</span>
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-ink-200 bg-white shadow-card">
+      <div className="border-t-2 border-ink-900 pt-4">
         <AnomalyHeatmap
           points={rows.map((r) => ({
             id: r.id,
@@ -58,10 +56,10 @@ export default async function MapPage() {
   );
 }
 
-function LegendSwatch({ color, label }: { color: string; label: string }) {
+function Legend({ mark, label }: { mark: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={`severity-dot ${color}`} />
+    <span className="inline-flex items-baseline gap-2">
+      <span className={`sev-mark ${mark}`} />
       {label}
     </span>
   );

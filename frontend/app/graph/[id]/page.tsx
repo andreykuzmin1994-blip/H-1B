@@ -23,7 +23,9 @@ export default async function GraphPage({ params }: { params: { id: string } }) 
     id,
   );
   const ids = rows.map((r: any) => Number(r.id));
-  const employers = ids.length ? await prisma.employer.findMany({ where: { id: { in: ids } } }) : [];
+  const employers = ids.length
+    ? await prisma.employer.findMany({ where: { id: { in: ids } } })
+    : [];
   const edges = ids.length
     ? await prisma.entityRelationship.findMany({
         where: { employer_id_a: { in: ids }, employer_id_b: { in: ids } },
@@ -60,18 +62,16 @@ export default async function GraphPage({ params }: { params: { id: string } }) 
   };
 
   return (
-    <div className="space-y-8">
-      <div className="page-header">
-        <div className="eyebrow">
-          <span className="h-px w-6 bg-ember-500" /> Network
-        </div>
-        <h1>Entity relationship explorer.</h1>
-        <p>
-          Two-hop graph of employers linked by shared officers, addresses, or trade-name aliases.
-          Red nodes have a documented enforcement outcome.
+    <div className="space-y-10">
+      <header>
+        <div className="dateline">Network</div>
+        <h1 className="mt-3 font-serif">Entity relationships.</h1>
+        <p className="mt-3 max-w-[65ch] text-[15px] leading-[1.55] text-ink-700">
+          Two-hop graph of employers linked by shared officers, addresses, or trade-name
+          aliases. Red nodes have a documented enforcement outcome.
         </p>
-      </div>
-      <div className="card">
+      </header>
+      <div className="border-t-2 border-ink-900 pt-4">
         <EntityGraph graph={graph} centerId={id} />
       </div>
     </div>

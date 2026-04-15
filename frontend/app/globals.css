@@ -3,174 +3,303 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 15, 22, 41;
-  --background-rgb: 248, 248, 246;
-  --paper: #f8f8f6;
-  --ink: #0f1629;
-  --ink-soft: #28334a;
-  --rule: rgba(15, 22, 41, 0.08);
+  --paper: #f4f1ea;
+  --ink: #111111;
+  --ink-soft: #3b3a35;
+  --ink-mute: #5e5b52;
+  --ink-fade: #8a867c;
+  --rule: #d8d5cc;
+  --rule-strong: #111111;
+  --accent: #9a1f1f;
 }
 
-html,
-body {
+html {
   background: var(--paper);
-  color: rgb(var(--foreground-rgb));
 }
 
 body {
-  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
-    Helvetica, Arial, sans-serif;
-  font-feature-settings: 'ss01', 'cv11';
+  color: var(--ink);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: 'ss01', 'cv11', 'ss02';
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Subtle paper grain on light backgrounds */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.025 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  opacity: 0.9;
-  z-index: 0;
+/* Typographic base: newspaper-measure paragraphs by default */
+p {
+  max-width: 65ch;
 }
 
-main,
-header,
-footer {
-  position: relative;
-  z-index: 1;
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-serif), ui-serif, Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+h1 {
+  font-size: clamp(2rem, 4vw, 3.1rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+h2 {
+  font-size: clamp(1.5rem, 2.4vw, 1.9rem);
+  line-height: 1.15;
+}
+h3 {
+  font-size: 1.125rem;
+  line-height: 1.25;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--paper);
 }
 
 @layer components {
-  .card {
-    @apply rounded-xl border border-ink-200/80 bg-white p-5 shadow-card;
-  }
-  .card-dark {
-    @apply rounded-xl border border-ink-800 bg-ink-900 p-5 text-ink-100 shadow-elevated;
+  /* Newspaper-style slug above a section: small caps, thin, restrained */
+  .slug {
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
   }
 
-  /* ------- Severity pills ------- */
-  .severity-badge {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide;
+  /* Horizontal rules at different strengths */
+  .hr-hair {
+    border: 0;
+    border-top: 1px solid var(--rule);
   }
-  .severity-dot {
-    @apply inline-block h-2 w-2 rounded-full;
+  .hr-thick {
+    border: 0;
+    border-top: 2px solid var(--rule-strong);
+  }
+  .hr-double {
+    border: 0;
+    border-top: 3px double var(--rule-strong);
+  }
+
+  /* A dateline/kicker — small, monospace, used for metadata like "Sep 2024 · DOL WHD" */
+  .dateline {
+    font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+  }
+
+  /* Only used where a categorical label genuinely helps scanning (rare). */
+  .tag {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4em;
+    font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .tag::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: currentColor;
+  }
+
+  /* Severity text treatments — NOT pills. Inline, colored, optional mark. */
+  .sev {
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .sev-mark {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    vertical-align: 0;
+    border-radius: 0; /* square marks feel less AI-pill */
   }
   .sev-critical {
-    @apply bg-red-50 text-red-700 ring-1 ring-inset ring-red-200;
+    color: #7a1616;
   }
   .sev-high {
-    @apply bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200;
+    color: #6b3a12;
   }
   .sev-medium {
-    @apply bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200;
+    color: #4a4413;
   }
   .sev-low {
-    @apply bg-lime-50 text-lime-700 ring-1 ring-inset ring-lime-200;
+    color: #3a4f2c;
+  }
+  .mark-critical {
+    background: #7a1616;
+  }
+  .mark-high {
+    background: #b06427;
+  }
+  .mark-medium {
+    background: #9a8a26;
+  }
+  .mark-low {
+    background: #6a8a52;
   }
 
-  /* ------- Editorial hero ------- */
-  .hero {
-    @apply relative overflow-hidden rounded-2xl border border-ink-800 bg-ink-950 text-ink-50 shadow-elevated;
-  }
-  .hero-grid {
-    background-image:
-      linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-    background-size: 28px 28px;
-  }
-
-  /* Accent rule used under section headings */
-  .rule {
-    @apply h-px w-10 bg-ember-500;
-  }
-  .eyebrow {
-    @apply inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-ember-500;
-  }
-
-  /* ------- Buttons ------- */
+  /* Primary button — a plain ink rectangle, no gradients, no arrows */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    border: 1px solid transparent;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
   .btn-primary {
-    @apply btn bg-ink-900 text-white hover:bg-ink-800;
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .btn-primary:hover {
+    background: var(--ink-soft);
   }
   .btn-accent {
-    @apply btn bg-ember-500 text-white hover:bg-ember-600;
+    background: var(--accent);
+    color: var(--paper);
   }
-  .btn-outline {
-    @apply btn border border-ink-200 bg-white text-ink-900 hover:border-ink-300 hover:bg-ink-50;
+  .btn-accent:hover {
+    background: #7a1616;
   }
-  .btn-ghost {
-    @apply btn text-ink-700 hover:bg-ink-100;
+  .btn-quiet {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--ink);
+  }
+  .btn-quiet:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .btn-text {
+    padding: 0;
+    color: var(--ink);
+    border-bottom: 1px solid var(--ink);
+  }
+  .btn-text:hover {
+    color: var(--accent);
+    border-color: var(--accent);
   }
 
-  /* ------- Form controls ------- */
-  .input {
-    @apply w-full rounded-md border border-ink-200 bg-white px-3 py-2 text-sm placeholder:text-ink-400
-           focus:border-ink-400 focus:outline-none focus:ring-2 focus:ring-ink-200;
+  /* Form inputs — a single hairline under the field, not a rounded box */
+  .field {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--rule-strong);
+    padding: 0.4rem 0;
+    font-size: 0.9375rem;
+    color: var(--ink);
+    font-family: inherit;
+  }
+  .field:focus {
+    outline: 0;
+    border-bottom-color: var(--accent);
+  }
+  .field::placeholder {
+    color: var(--ink-fade);
+  }
+  .field-label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: 4px;
   }
 
-  /* ------- Tables ------- */
-  .data-table {
-    @apply min-w-full text-sm;
+  /* Data tables — broadsheet style. Thin rules, tabular nums, no hover glow. */
+  .ledger {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
   }
-  .data-table thead th {
-    @apply whitespace-nowrap border-b border-ink-200 bg-ink-50/60 px-4 py-2.5 text-left text-[11px]
-           font-semibold uppercase tracking-wider text-ink-500;
+  .ledger th {
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 16px 8px;
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--rule-strong);
+    background: transparent;
+    white-space: nowrap;
   }
-  .data-table tbody td {
-    @apply whitespace-nowrap border-b border-ink-100 px-4 py-3 align-middle text-ink-800;
+  .ledger td {
+    padding: 12px 16px;
+    font-size: 0.875rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: baseline;
+    color: var(--ink);
   }
-  .data-table tbody tr:hover {
-    @apply bg-ink-50/60;
+  .ledger tbody tr:last-child td {
+    border-bottom: 2px solid var(--ink);
   }
-  .data-table tbody tr:last-child td {
-    @apply border-b-0;
-  }
-  .num {
+  .ledger .num,
+  .ledger td.num {
     font-variant-numeric: tabular-nums;
     font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+    font-size: 0.8125rem;
   }
 
-  /* Link treatment */
+  /* Inline, low-ornament link treatment for body prose */
   .link {
-    @apply font-medium text-ink-900 underline decoration-ember-500 decoration-2 underline-offset-4
-           hover:text-ember-600;
+    color: var(--ink);
+    border-bottom: 1px solid var(--ink);
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .link:hover {
+    color: var(--accent);
+    border-color: var(--accent);
   }
 
-  /* Page header pattern */
-  .page-header {
-    @apply space-y-2;
-  }
-  .page-header h1 {
-    @apply font-serif text-3xl font-semibold tracking-tight text-ink-900 md:text-4xl;
-  }
-  .page-header p {
-    @apply max-w-3xl text-sm text-ink-600 md:text-base;
+  /* Thin column separators used in multi-column stat bars */
+  .sep-col + .sep-col {
+    border-left: 1px solid var(--rule);
+    padding-left: 1.5rem;
+    margin-left: 1.5rem;
   }
 
-  /* Stat card */
-  .stat {
-    @apply relative overflow-hidden rounded-xl border border-ink-200 bg-white p-4 shadow-card;
+  /* Drop cap for article-style leads */
+  .dropcap::first-letter {
+    font-family: var(--font-serif), ui-serif, Georgia, serif;
+    font-weight: 600;
+    float: left;
+    font-size: 3.6rem;
+    line-height: 0.85;
+    padding: 0.35rem 0.5rem 0 0;
+    color: var(--ink);
   }
-  .stat-label {
-    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500;
-  }
-  .stat-value {
-    @apply mt-2 font-serif text-3xl font-semibold text-ink-900;
-  }
-  .stat-sub {
-    @apply mt-1 text-xs text-ink-500;
-  }
-  .stat-accent::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: linear-gradient(180deg, #f97316 0%, #b91c1c 100%);
-  }
+}
+
+/* Utilities that feel closer to print than to SaaS */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+.caps {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 10px;
+  font-weight: 600;
 }

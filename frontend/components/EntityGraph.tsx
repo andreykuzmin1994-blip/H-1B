@@ -28,7 +28,6 @@ export function EntityGraph({
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Force simulation requires separate node/edge objects d3 can mutate.
   const data = useMemo(
     () => ({
       nodes: graph.nodes.map((n) => ({ ...n })),
@@ -53,39 +52,42 @@ export function EntityGraph({
         d3
           .forceLink(data.links as any)
           .id((d: any) => d.id)
-          .distance(80),
+          .distance(90),
       )
-      .force('charge', d3.forceManyBody().strength(-260))
+      .force('charge', d3.forceManyBody().strength(-240))
       .force('center', d3.forceCenter(width / 2, height / 2));
 
     const link = svg
       .append('g')
-      .attr('stroke', '#94a3b8')
-      .attr('stroke-opacity', 0.6)
+      .attr('stroke', '#8a867c')
+      .attr('stroke-opacity', 0.5)
       .selectAll('line')
       .data(data.links)
       .enter()
       .append('line')
-      .attr('stroke-width', (d) => 1 + d.confidence * 2);
+      .attr('stroke-width', (d) => 0.8 + d.confidence * 1.5);
 
     const node = svg
       .append('g')
-      .selectAll('circle')
+      .selectAll('rect')
       .data(data.nodes)
       .enter()
-      .append('circle')
-      .attr('r', (d) => (d.id === centerId ? 14 : 8))
+      .append('rect')
+      .attr('width', (d) => (d.id === centerId ? 14 : 9))
+      .attr('height', (d) => (d.id === centerId ? 14 : 9))
       .attr('fill', (d) => {
-        if (d.is_violator) return '#dc2626';
-        if (d.id === centerId) return '#0ea5e9';
-        if (d.anomaly_score >= 50) return '#f97316';
-        if (d.anomaly_score >= 25) return '#eab308';
-        return '#a3e635';
+        if (d.is_violator) return '#7a1616';
+        if (d.id === centerId) return '#111111';
+        if (d.anomaly_score >= 50) return '#b06427';
+        if (d.anomaly_score >= 25) return '#9a8a26';
+        return '#6a8a52';
       })
-      .attr('stroke', '#111827')
-      .attr('stroke-width', 1);
+      .attr('stroke', '#111111')
+      .attr('stroke-width', 0.5);
 
-    node.append('title').text((d) => `${d.name} (${d.state}) · score ${d.anomaly_score.toFixed(0)}`);
+    node
+      .append('title')
+      .text((d) => `${d.name} (${d.state}) · score ${d.anomaly_score.toFixed(0)}`);
 
     const label = svg
       .append('g')
@@ -93,10 +95,12 @@ export function EntityGraph({
       .data(data.nodes)
       .enter()
       .append('text')
-      .text((d) => d.name.slice(0, 24))
-      .attr('font-size', 10)
-      .attr('dx', 12)
-      .attr('dy', 4);
+      .text((d) => d.name.slice(0, 28))
+      .attr('font-size', 11)
+      .attr('font-family', 'Source Serif 4, Georgia, serif')
+      .attr('fill', '#111111')
+      .attr('dx', 10)
+      .attr('dy', 9);
 
     simulation.on('tick', () => {
       link
@@ -104,7 +108,9 @@ export function EntityGraph({
         .attr('y1', (d: any) => d.source.y)
         .attr('x2', (d: any) => d.target.x)
         .attr('y2', (d: any) => d.target.y);
-      node.attr('cx', (d: any) => d.x).attr('cy', (d: any) => d.y);
+      node
+        .attr('x', (d: any) => d.x - (d.id === centerId ? 7 : 4.5))
+        .attr('y', (d: any) => d.y - (d.id === centerId ? 7 : 4.5));
       label.attr('x', (d: any) => d.x).attr('y', (d: any) => d.y);
     });
 
@@ -115,34 +121,34 @@ export function EntityGraph({
 
   if (data.nodes.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-ink-200 bg-white/60 p-6 text-center text-sm text-ink-500">
+      <p className="text-sm italic text-ink-500">
         No entity relationships on file. Run{' '}
-        <code className="rounded bg-ink-100 px-1.5 py-0.5 text-xs">python scripts/graph.py build-all</code>{' '}
-        to resolve officer and address links.
-      </div>
+        <code className="font-mono text-xs">python scripts/graph.py build-all</code> to resolve
+        officer and address links.
+      </p>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <svg ref={svgRef} style={{ width: '100%', height: 360 }} />
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-500">
-        <LegendDot color="#0ea5e9" label="Centered employer" />
-        <LegendDot color="#dc2626" label="Violator" />
-        <LegendDot color="#f97316" label="High score (50+)" />
-        <LegendDot color="#eab308" label="Medium (25–49)" />
-        <LegendDot color="#a3e635" label="Low / clean" />
+      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-[11px] uppercase tracking-wider text-ink-500">
+        <Swatch color="#111111" label="Centered" />
+        <Swatch color="#7a1616" label="Violator" />
+        <Swatch color="#b06427" label="High" />
+        <Swatch color="#9a8a26" label="Medium" />
+        <Swatch color="#6a8a52" label="Low" />
       </div>
     </div>
   );
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
+function Swatch({ color, label }: { color: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-baseline gap-2">
       <span
-        className="inline-block h-2.5 w-2.5 rounded-full"
-        style={{ backgroundColor: color }}
+        className="inline-block"
+        style={{ width: 8, height: 8, backgroundColor: color }}
       />
       {label}
     </span>

@@ -4,8 +4,8 @@ import { prisma } from '@/lib/db';
 import {
   formatCurrency,
   severityClass,
-  severityDotClass,
   severityLabel,
+  severityMarkClass,
   severityTagline,
 } from '@/lib/formatters';
 import { WageChart } from '@/components/WageChart';
@@ -146,137 +146,131 @@ export default async function EmployerPage({ params }: { params: { id: string } 
   }));
 
   return (
-    <div className="space-y-10">
-      {/* ---------- HERO ---------- */}
-      <section className="relative overflow-hidden rounded-2xl border border-ink-800 bg-ink-950 p-6 text-ink-100 shadow-elevated md:p-10">
-        <div className="hero-grid pointer-events-none absolute inset-0 opacity-60" />
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-ember-500/20 blur-3xl" />
-        <div className="relative flex flex-wrap items-start justify-between gap-6">
-          <div className="min-w-0 flex-1">
-            <div className="eyebrow">
-              <span className="h-px w-6 bg-ember-500" /> Employer dossier
-            </div>
-            <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-white md:text-4xl">
-              {employer.name}
-            </h1>
-            <p className="mt-2 text-sm text-ink-300">
-              {employer.address_line1 && `${employer.address_line1}, `}
-              {employer.city}
-              {employer.state && `, ${employer.state}`} {employer.zip ?? ''}
-            </p>
-            <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs uppercase tracking-[0.16em] text-ink-400">
-              <span>
-                NAICS <span className="font-mono text-ink-200">{employer.naics_code ?? '—'}</span>
-              </span>
-              <span>
-                EIN <span className="font-mono text-ink-200">{employer.ein ?? '—'}</span>
-              </span>
-              <span>
-                LCAs{' '}
-                <span className="font-mono text-ink-200">
-                  {employer.total_lca_count?.toLocaleString() ?? '0'}
-                </span>
-              </span>
-            </div>
-          </div>
+    <article className="space-y-14">
+      {/* ---------- CASE HEADER ---------- */}
+      <header>
+        <div className="dateline">Case file · Employer dossier</div>
+        <h1 className="mt-3 font-serif text-ink-900">{employer.name}</h1>
+        <p className="mt-2 text-sm text-ink-600">
+          {[employer.address_line1, employer.city].filter(Boolean).join(', ')}
+          {employer.state && `, ${employer.state}`} {employer.zip ?? ''}
+        </p>
 
-          <div className="flex flex-col items-end gap-3">
-            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-right">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-400">
-                Anomaly score
-              </div>
-              <div className="mt-1 font-serif text-4xl font-semibold tracking-tight text-white">
+        <div className="mt-8 grid grid-cols-1 gap-6 border-t-2 border-ink-900 pt-4 md:grid-cols-12">
+          <dl className="md:col-span-8 grid grid-cols-2 gap-y-2 gap-x-8 text-sm md:grid-cols-4">
+            <FactRow label="NAICS" value={employer.naics_code ?? '—'} />
+            <FactRow label="EIN" value={employer.ein ?? '—'} mono />
+            <FactRow
+              label="LCA filings"
+              value={employer.total_lca_count?.toLocaleString() ?? '0'}
+            />
+            <FactRow
+              label="First seen"
+              value={
+                employer.first_filing_date
+                  ? new Date(employer.first_filing_date).getFullYear().toString()
+                  : '—'
+              }
+            />
+          </dl>
+
+          <div className="md:col-span-4">
+            <div className="caps text-ink-500">Anomaly score</div>
+            <div className="mt-1 flex items-baseline gap-3">
+              <span className="font-serif text-5xl font-semibold leading-none text-ink-900 tabular">
                 {score.toFixed(0)}
-                <span className="text-lg text-ink-400">/100</span>
-              </div>
-              <div className="mt-1">
-                <span className={`severity-badge ${severityClass(score)}`}>
-                  <span className={`severity-dot ${severityDotClass(score)}`} />
-                  {severityLabel(score)}
-                </span>
-              </div>
-              <p className="mt-2 max-w-[14rem] text-[11px] leading-snug text-ink-400">
-                {severityTagline(score)}
-              </p>
+              </span>
+              <span className="text-sm text-ink-500">/ 100</span>
             </div>
-            <Link href={`/tip/${employer.id}`} className="btn-accent">
-              Generate enforcement tip →
-            </Link>
-            <div className="flex w-full items-center justify-end gap-2">
+            <div className="mt-2">
+              <span className={`sev ${severityClass(score)}`}>
+                <span className={`sev-mark ${severityMarkClass(score)}`} />
+                {severityLabel(score)}
+              </span>
+              <span className="ml-3 text-sm italic text-ink-600">
+                {severityTagline(score)}
+              </span>
+            </div>
+            <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
+              <Link href={`/tip/${employer.id}`} className="btn-text">
+                Generate enforcement tip
+              </Link>
               <Link
                 href={`/compare?ids=${employer.id}`}
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10"
+                className="btn-text"
               >
-                + Add to compare
+                Add to comparison
               </Link>
               <ShareButton path={`/employer/${employer.id}`} />
             </div>
           </div>
         </div>
-      </section>
+      </header>
 
       {/* ---------- FLAGS ---------- */}
       <section>
-        <SectionHeading
-          label="Signals"
-          title="Anomaly flags"
-          sub="Each flag is a public-data signal — not a legal finding. See the methodology for what each flag does and does not prove."
-        />
-        <AnomalyFlagList
-          flags={employer.flags.map((f) => ({ ...f, flag_score: Number(f.flag_score) }))}
-        />
-        <div className="mt-3 text-xs text-ink-500">
-          <Link href="/methodology" className="link">
-            What do these flags mean? →
+        <header className="flex items-baseline justify-between gap-6">
+          <h2 className="font-serif">Signals the engine raised</h2>
+          <Link href="/methodology" className="btn-text text-sm">
+            What the flags mean
           </Link>
-        </div>
+        </header>
+        <hr className="hr-hair mt-3 mb-6" />
+        <AnomalyFlagList
+          flags={employer.flags.map((f) => ({
+            ...f,
+            flag_score: Number(f.flag_score),
+          }))}
+        />
       </section>
 
       {/* ---------- WAGE + ADDRESS ---------- */}
-      <section className="grid grid-cols-1 gap-5 md:grid-cols-2">
-        <div className="card">
-          <h3 className="font-serif text-lg font-semibold text-ink-900">Wage analysis</h3>
-          <p className="mt-1 text-xs text-ink-500">
-            Average filed wage vs. BLS OEWS national median, by SOC code.
+      <section className="grid grid-cols-1 gap-10 md:grid-cols-12">
+        <div className="md:col-span-7">
+          <h2 className="font-serif">Wage comparison</h2>
+          <p className="mt-1 text-sm italic text-ink-600">
+            Average filed wage versus BLS OEWS national median, by SOC code.
           </p>
-          <div className="mt-4">
-            {wageData.length === 0 ? (
-              <p className="text-sm text-ink-500">
-                No wage benchmark data available for this employer&rsquo;s SOC codes.
-              </p>
-            ) : (
-              <WageChart data={wageData} />
-            )}
-          </div>
+          <hr className="hr-hair mt-3 mb-4" />
+          {wageData.length === 0 ? (
+            <p className="text-sm text-ink-500">
+              No wage benchmark data available for this employer&rsquo;s SOC codes.
+            </p>
+          ) : (
+            <WageChart data={wageData} />
+          )}
         </div>
-        <div className="card">
-          <h3 className="font-serif text-lg font-semibold text-ink-900">Address</h3>
-          <p className="mt-1 text-xs text-ink-500">Physical footprint and classification.</p>
-          <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-ink-500">Classification</dt>
-              <dd className="font-semibold text-ink-900">
-                {employer.address_type ?? 'UNKNOWN'}
-              </dd>
-            </div>
+        <div className="md:col-span-5">
+          <h2 className="font-serif">Address</h2>
+          <p className="mt-1 text-sm italic text-ink-600">
+            Physical footprint and classification.
+          </p>
+          <hr className="hr-hair mt-3 mb-4" />
+          <dl className="space-y-2 text-sm">
+            <FactInline
+              label="Classification"
+              value={employer.address_type ?? 'Unknown'}
+            />
             {employer.address_geocoded_lat && (
-              <div className="flex justify-between">
-                <dt className="text-ink-500">Coordinates</dt>
-                <dd className="num text-ink-800">
-                  {Number(employer.address_geocoded_lat).toFixed(4)},{' '}
-                  {Number(employer.address_geocoded_lng).toFixed(4)}
-                </dd>
-              </div>
+              <FactInline
+                label="Coordinates"
+                value={`${Number(employer.address_geocoded_lat).toFixed(4)}, ${Number(
+                  employer.address_geocoded_lng,
+                ).toFixed(4)}`}
+                mono
+              />
             )}
           </dl>
           {employer.address_line1 && (
             <Link
-              className="mt-4 inline-flex text-sm font-medium text-ink-800 underline underline-offset-4 decoration-ember-500 decoration-2 hover:text-ember-600"
+              className="mt-4 inline-block text-sm link"
               href={`/address/${encodeURIComponent(
-                [employer.address_line1, employer.city, employer.state].filter(Boolean).join('|'),
+                [employer.address_line1, employer.city, employer.state]
+                  .filter(Boolean)
+                  .join('|'),
               )}`}
             >
-              Other entities at this address →
+              Other entities at this address
             </Link>
           )}
         </div>
@@ -284,74 +278,77 @@ export default async function EmployerPage({ params }: { params: { id: string } 
 
       {/* ---------- FILING ACTIVITY ---------- */}
       <section>
-        <SectionHeading label="Activity" title="Filing history" />
+        <h2 className="font-serif">Filing activity</h2>
+        <hr className="hr-hair mt-3 mb-6" />
         <EmployerCharts byYear={byYear} bySoc={bySoc} uscisByYear={uscisByYear} />
       </section>
 
       {/* ---------- GRAPH ---------- */}
       <section>
-        <SectionHeading label="Network" title="Entity relationships" />
-        <div className="card">
-          <EntityGraph graph={graph} centerId={id} />
-        </div>
+        <h2 className="font-serif">Entity network</h2>
+        <p className="mt-1 text-sm italic text-ink-600">
+          Two-hop graph of employers linked by shared officers, addresses, or trade-name aliases.
+        </p>
+        <hr className="hr-hair mt-3 mb-6" />
+        <EntityGraph graph={graph} centerId={id} />
       </section>
 
       {/* ---------- FILINGS TABLE ---------- */}
       <section>
-        <SectionHeading
-          label="Disclosures"
-          title="Filing history"
-          sub="Most recent 100 LCA filings from DOL OFLC."
-        />
-        <div className="overflow-hidden rounded-xl border border-ink-200 bg-white shadow-card">
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Case #</th>
-                  <th>Status</th>
-                  <th>SOC</th>
-                  <th>Job title</th>
-                  <th className="text-right">Wage (annual)</th>
-                  <th>Worksite</th>
-                  <th>Received</th>
+        <h2 className="font-serif">Most recent filings</h2>
+        <p className="mt-1 text-sm italic text-ink-600">
+          The hundred most recent LCA filings from DOL OFLC.
+        </p>
+        <hr className="hr-hair mt-3 mb-6" />
+        <div className="overflow-x-auto">
+          <table className="ledger">
+            <thead>
+              <tr>
+                <th>Case</th>
+                <th>Status</th>
+                <th>SOC</th>
+                <th>Job title</th>
+                <th className="text-right">Annual wage</th>
+                <th>Worksite</th>
+                <th>Received</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employer.filings.map((f) => (
+                <tr key={f.id}>
+                  <td className="num">{f.case_number}</td>
+                  <td>
+                    <StatusText status={f.case_status} />
+                  </td>
+                  <td className="num">{f.soc_code}</td>
+                  <td>{f.job_title}</td>
+                  <td className="num text-right">
+                    {formatCurrency(f.wage_annualized ? Number(f.wage_annualized) : null)}
+                  </td>
+                  <td className="text-ink-700">
+                    {f.worksite_city}
+                    {f.worksite_state ? `, ${f.worksite_state}` : ''}
+                  </td>
+                  <td className="num">
+                    {f.received_date ? new Date(f.received_date).toLocaleDateString() : '—'}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {employer.filings.map((f) => (
-                  <tr key={f.id}>
-                    <td className="num text-ink-600">{f.case_number}</td>
-                    <td>
-                      <StatusChip status={f.case_status} />
-                    </td>
-                    <td className="num">{f.soc_code}</td>
-                    <td>{f.job_title}</td>
-                    <td className="num text-right">
-                      {formatCurrency(f.wage_annualized ? Number(f.wage_annualized) : null)}
-                    </td>
-                    <td className="text-ink-600">
-                      {f.worksite_city}
-                      {f.worksite_state ? `, ${f.worksite_state}` : ''}
-                    </td>
-                    <td className="num text-ink-600">
-                      {f.received_date ? new Date(f.received_date).toLocaleDateString() : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
       {employer.layoff_events.length > 0 && (
         <section>
-          <SectionHeading
-            label="Displacement"
-            title="Layoffs and concurrent H-1B filings"
-            sub={`WARN Act and supplemental layoff notices. "Concurrent H-1B" counts LCAs filed within ±${LAYOFF_WINDOW_DAYS} days — the INA §212(n)(1)(E) non-displacement window.`}
-          />
-          <div className="card space-y-4">
+          <h2 className="font-serif">Layoffs and concurrent H-1B filings</h2>
+          <p className="mt-1 max-w-[70ch] text-sm italic text-ink-600">
+            WARN Act and supplemental layoff notices. &ldquo;Concurrent H-1B&rdquo; counts LCAs
+            filed within ±{LAYOFF_WINDOW_DAYS} days &mdash; the INA §212(n)(1)(E) non-displacement
+            window for H-1B-dependent employers.
+          </p>
+          <hr className="hr-hair mt-3 mb-6" />
+          <ul className="divide-y divide-ink-100">
             {employer.layoff_events.map((l) => {
               const pivot = l.effective_date ?? l.notice_date;
               const pivotMs = pivot ? new Date(pivot).getTime() : null;
@@ -363,132 +360,141 @@ export default async function EmployerPage({ params }: { params: { id: string } 
                         LAYOFF_WINDOW_DAYS * DAY_MS,
                   )
                 : [];
-              const hot = concurrent.length > 0;
               return (
-                <div
+                <li
                   key={l.id}
-                  className={`relative rounded-md border-l-4 pl-4 py-1 ${
-                    hot ? 'border-red-600 bg-red-50/40' : 'border-ink-200'
+                  className={`flex flex-wrap items-baseline gap-x-6 gap-y-1 py-3 ${
+                    concurrent.length > 0
+                      ? 'border-l-[3px] border-accent pl-4'
+                      : ''
                   }`}
                 >
-                  <div className="font-serif text-base font-semibold text-ink-900">
-                    {l.workers_affected ? l.workers_affected.toLocaleString() : '?'} workers ·{' '}
-                    {[l.location_city, l.location_state].filter(Boolean).join(', ') || '—'}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-ink-900">
+                      {l.workers_affected ? l.workers_affected.toLocaleString() : '?'} workers
+                      laid off &mdash;{' '}
+                      {[l.location_city, l.location_state].filter(Boolean).join(', ') || '—'}
+                    </div>
+                    <div className="dateline mt-0.5">
+                      {l.source} ·{' '}
+                      {l.effective_date
+                        ? `effective ${new Date(l.effective_date).toLocaleDateString()}`
+                        : l.notice_date
+                        ? `noticed ${new Date(l.notice_date).toLocaleDateString()}`
+                        : 'date unknown'}
+                    </div>
+                    {l.reason && (
+                      <div className="mt-1 text-sm text-ink-700">Reason: {l.reason}</div>
+                    )}
                   </div>
-                  <div className="mt-0.5 text-xs text-ink-500">
-                    <span className="font-mono uppercase tracking-wider">{l.source}</span> ·{' '}
-                    {l.effective_date
-                      ? `effective ${new Date(l.effective_date).toLocaleDateString()}`
-                      : l.notice_date
-                      ? `noticed ${new Date(l.notice_date).toLocaleDateString()}`
-                      : 'date unknown'}
-                  </div>
-                  {l.reason && (
-                    <div className="mt-1 text-sm text-ink-700">Reason: {l.reason}</div>
-                  )}
-                  {hot && (
-                    <div className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-red-700">
-                      <span className="severity-dot bg-red-600 animate-pulseDot" />
-                      {concurrent.length} H-1B LCA{concurrent.length === 1 ? '' : 's'} filed within
-                      ±{LAYOFF_WINDOW_DAYS} days
+                  {concurrent.length > 0 && (
+                    <div className="text-sm font-semibold text-accent">
+                      {concurrent.length} concurrent H-1B LCA
+                      {concurrent.length === 1 ? '' : 's'}
                     </div>
                   )}
                   {l.source_url && (
-                    <div className="mt-1">
-                      <a
-                        className="text-xs font-medium text-ink-800 underline underline-offset-4 decoration-ember-500 decoration-2 hover:text-ember-600"
-                        href={l.source_url}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        Source notice ↗
-                      </a>
-                    </div>
+                    <a
+                      className="text-sm link"
+                      href={l.source_url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Source notice
+                    </a>
                   )}
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </section>
       )}
 
       {employer.violations.length > 0 && (
         <section>
-          <SectionHeading label="Enforcement" title="Resolved violations" />
-          <div className="card space-y-4">
+          <h2 className="font-serif">Resolved violations</h2>
+          <hr className="hr-hair mt-3 mb-6" />
+          <ul className="divide-y divide-ink-100">
             {employer.violations.map((v) => (
-              <div
+              <li
                 key={v.id}
-                className="relative rounded-md border-l-4 border-red-600 bg-red-50/30 pl-4 py-1"
+                className="border-l-[3px] border-accent pl-4 py-3"
               >
-                <div className="font-serif text-base font-semibold text-ink-900">
+                <div className="font-semibold text-ink-900">
                   {v.violation_type || 'Violation'}
                 </div>
-                <div className="mt-0.5 text-xs text-ink-500">
-                  <span className="font-mono uppercase tracking-wider">{v.source}</span> ·{' '}
+                <div className="dateline mt-0.5">
+                  {v.source} ·{' '}
                   {v.violation_date
                     ? new Date(v.violation_date).toLocaleDateString()
                     : 'date unknown'}
                 </div>
-                {v.back_wages_amount && (
-                  <div className="text-sm text-ink-700">
-                    Back wages: {formatCurrency(Number(v.back_wages_amount))}
-                  </div>
-                )}
-                {v.penalty_amount && (
-                  <div className="text-sm text-ink-700">
-                    Penalty: {formatCurrency(Number(v.penalty_amount))}
+                {(v.back_wages_amount || v.penalty_amount) && (
+                  <div className="mt-1 text-sm text-ink-700">
+                    {v.back_wages_amount &&
+                      `Back wages ${formatCurrency(Number(v.back_wages_amount))}`}
+                    {v.back_wages_amount && v.penalty_amount && ' · '}
+                    {v.penalty_amount &&
+                      `Penalty ${formatCurrency(Number(v.penalty_amount))}`}
                   </div>
                 )}
                 {v.description && (
                   <p className="mt-1 text-sm text-ink-700">{v.description}</p>
                 )}
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
       )}
-    </div>
+    </article>
   );
 }
 
-function SectionHeading({
+function FactRow({
   label,
-  title,
-  sub,
+  value,
+  mono,
 }: {
   label: string;
-  title: string;
-  sub?: string;
+  value: string;
+  mono?: boolean;
 }) {
   return (
-    <div className="mb-5">
-      <div className="eyebrow">
-        <span className="h-px w-6 bg-ember-500" /> {label}
-      </div>
-      <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-ink-900">
-        {title}
-      </h2>
-      {sub && <p className="mt-1 max-w-3xl text-sm text-ink-600">{sub}</p>}
+    <div>
+      <dt className="caps text-ink-500">{label}</dt>
+      <dd className={`mt-0.5 ${mono ? 'font-mono text-sm' : 'text-sm'} text-ink-900`}>
+        {value}
+      </dd>
     </div>
   );
 }
 
-function StatusChip({ status }: { status: string | null }) {
+function FactInline({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-ink-100 pb-1">
+      <dt className="text-ink-500">{label}</dt>
+      <dd className={mono ? 'font-mono text-xs' : undefined}>{value}</dd>
+    </div>
+  );
+}
+
+function StatusText({ status }: { status: string | null }) {
   if (!status) return <span className="text-ink-400">—</span>;
   const s = status.toUpperCase();
-  const positive = s.includes('CERTIF');
-  const negative = s.includes('DENIED') || s.includes('WITHDRAWN');
-  const cls = positive
-    ? 'bg-lime-50 text-lime-700 ring-lime-200'
-    : negative
-    ? 'bg-red-50 text-red-700 ring-red-200'
-    : 'bg-ink-100 text-ink-700 ring-ink-200';
+  const tone = s.includes('CERTIF')
+    ? 'text-ink-800'
+    : s.includes('DENIED') || s.includes('WITHDRAWN')
+    ? 'text-accent'
+    : 'text-ink-700';
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1 ring-inset ${cls}`}
-    >
-      {status}
-    </span>
+    <span className={`text-xs font-semibold uppercase tracking-wider ${tone}`}>{status}</span>
   );
 }

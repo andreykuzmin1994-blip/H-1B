@@ -24,41 +24,42 @@ export default async function ViolatorsPage() {
   ).size;
 
   return (
-    <div className="space-y-8">
-      <div className="page-header">
-        <div className="eyebrow">
-          <span className="h-px w-6 bg-ember-500" /> Enforcement archive
+    <div className="space-y-10">
+      <header className="md:grid md:grid-cols-12 md:gap-10">
+        <div className="md:col-span-8">
+          <div className="dateline">Enforcement record</div>
+          <h1 className="mt-3 font-serif">
+            The employers the government has already caught.
+          </h1>
+          <p className="mt-3 max-w-[65ch] text-[15px] leading-[1.55] text-ink-700">
+            Every row below is a documented outcome from a Department of Labor Wage &amp; Hour
+            investigation, a USCIS enforcement referral, or the DOL Willful Violator list. These
+            are not allegations. They are resolved findings.
+          </p>
         </div>
-        <h1>Employers the government has already caught.</h1>
-        <p>
-          Every row is a documented outcome from DOL Wage & Hour Division investigations, USCIS
-          enforcement referrals, or the DOL Willful Violator list. These are not accusations &mdash;
-          they are resolved findings.
-        </p>
-      </div>
-
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="stat stat-accent">
-          <div className="stat-label">Violations shown</div>
-          <div className="stat-value">{violations.length.toLocaleString()}</div>
-          <div className="stat-sub">Most recent 200 outcomes</div>
-        </div>
-        <div className="stat stat-accent">
-          <div className="stat-label">Distinct employers</div>
-          <div className="stat-value">{uniqueEmployers.toLocaleString()}</div>
-          <div className="stat-sub">Some appear more than once</div>
-        </div>
-        <div className="stat stat-accent">
-          <div className="stat-label">Back wages + penalties</div>
-          <div className="stat-value">{formatCurrency(totalBackWages + totalPenalty)}</div>
-          <div className="stat-sub">
-            {formatCurrency(totalBackWages)} wages · {formatCurrency(totalPenalty)} penalties
+        <aside className="mt-8 md:col-span-4 md:mt-0">
+          <div className="border-t-2 border-ink-900 pt-3">
+            <dl className="space-y-3 text-sm">
+              <SidebarStat
+                label="Resolved violations"
+                value={violations.length.toLocaleString()}
+              />
+              <SidebarStat
+                label="Distinct employers"
+                value={uniqueEmployers.toLocaleString()}
+              />
+              <SidebarStat
+                label="Back wages"
+                value={formatCurrency(totalBackWages)}
+              />
+              <SidebarStat label="Penalties" value={formatCurrency(totalPenalty)} />
+            </dl>
           </div>
-        </div>
-      </section>
+        </aside>
+      </header>
 
-      <div className="overflow-hidden rounded-xl border border-ink-200 bg-white shadow-card">
-        <table className="data-table">
+      <div className="overflow-x-auto">
+        <table className="ledger">
           <thead>
             <tr>
               <th>Employer</th>
@@ -74,23 +75,20 @@ export default async function ViolatorsPage() {
               <tr key={v.id}>
                 <td>
                   {v.employer_id ? (
-                    <Link
-                      className="font-medium text-ink-900 hover:text-ember-600"
-                      href={`/employer/${v.employer_id}`}
-                    >
+                    <Link href={`/employer/${v.employer_id}`} className="link">
                       {v.employer?.name ?? v.employer_name_raw}
                     </Link>
                   ) : (
-                    <span className="text-ink-700">{v.employer_name_raw}</span>
+                    <span className="text-ink-800">{v.employer_name_raw}</span>
                   )}
                 </td>
                 <td>
-                  <span className="rounded-md bg-ink-100 px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-ink-700">
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-ink-600">
                     {v.source}
                   </span>
                 </td>
                 <td className="text-ink-700">{v.violation_type || '—'}</td>
-                <td className="num text-ink-600">
+                <td className="num">
                   {v.violation_date ? new Date(v.violation_date).toLocaleDateString() : '—'}
                 </td>
                 <td className="num text-right">
@@ -111,6 +109,15 @@ export default async function ViolatorsPage() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function SidebarStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between border-b border-ink-100 pb-1.5">
+      <dt className="text-ink-600">{label}</dt>
+      <dd className="font-mono text-sm tabular text-ink-900">{value}</dd>
     </div>
   );
 }

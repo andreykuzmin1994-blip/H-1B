@@ -2,30 +2,34 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import {
   severityClass,
-  severityDotClass,
+  severityMarkClass,
   severityLabel,
 } from '@/lib/formatters';
 
 export const revalidate = 300;
 
 async function getStats() {
-  const [employers, filings, violations, flagged, layoffs, backWagesAgg] = await Promise.all([
+  const [employers, filings, violations, flagged, backWagesAgg] = await Promise.all([
     prisma.employer.count(),
     prisma.lcaFiling.count(),
     prisma.violation.count(),
     prisma.employer.count({ where: { anomaly_score: { gte: 50 } } }),
-    prisma.layoffEvent.count(),
     prisma.violation.aggregate({ _sum: { back_wages_amount: true } }),
   ]);
-  const backWages = Number(backWagesAgg._sum.back_wages_amount ?? 0);
-  return { employers, filings, violations, flagged, layoffs, backWages };
+  return {
+    employers,
+    filings,
+    violations,
+    flagged,
+    backWages: Number(backWagesAgg._sum.back_wages_amount ?? 0),
+  };
 }
 
 async function getTopFlagged() {
   return prisma.employer.findMany({
     where: { anomaly_score: { gt: 0 } },
     orderBy: { anomaly_score: 'desc' },
-    take: 12,
+    take: 15,
   });
 }
 
@@ -36,6 +40,7 @@ function compactNumber(n: number): string {
 }
 
 function compactCurrency(n: number): string {
+  if (!n) return '—';
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
   return `$${n.toLocaleString()}`;
@@ -45,149 +50,107 @@ export default async function HomePage() {
   const [stats, top] = await Promise.all([getStats(), getTopFlagged()]);
 
   return (
-    <div className="space-y-14">
-      {/* ---------- HERO ---------- */}
-      <section className="hero hero-grid px-6 py-14 md:px-12 md:py-20">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-ember-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="relative max-w-3xl">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-ember-400">
-            <span className="inline-block h-2 w-2 rounded-full bg-ember-500 animate-pulseDot" />
-            Live · {compactNumber(stats.filings)} filings indexed
-          </div>
-          <h1 className="mt-5 font-serif text-4xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
-            Who is gaming the{' '}
-            <span className="relative inline-block">
-              <span className="relative z-10">H-1B system</span>
-              <span className="absolute inset-x-0 bottom-1 h-3 bg-ember-500/40" aria-hidden />
-            </span>
-            {' '}&mdash; and who&apos;s paying for it?
+    <div className="space-y-16">
+      {/* ---------- LEDE ---------- */}
+      <article className="grid grid-cols-1 gap-10 md:grid-cols-12">
+        <div className="md:col-span-8">
+          <div className="caps text-ink-500">The investigation</div>
+          <h1 className="mt-2 font-serif text-ink-900">
+            Who is gaming the H-1B system, and who is paying for it.
           </h1>
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-ink-200 md:text-lg">
-            We join DOL&nbsp;LCA disclosures, USCIS employer data, DOL&nbsp;WHD enforcement records,
-            BLS wage benchmarks, and WARN Act layoff notices into a single system that{' '}
-            <span className="text-white">flags anomalies</span>, maps shell-entity networks, and
-            writes the enforcement tip for you.
+          <p className="dropcap mt-6 text-[17px] leading-[1.55] text-ink-800">
+            This project joins Department of Labor wage disclosures, USCIS petition outcomes,
+            Wage &amp; Hour Division enforcement records, BLS wage benchmarks, and federal and
+            state layoff notices into a single investigative index. It finds employers whose
+            filings, pay, denials, and firings tell a story the official datasets alone do not.
+            Every number on this site links to the document that produced it.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/search" className="btn-accent">
-              Start an investigation →
+          <p className="mt-5 max-w-[65ch] text-[15px] leading-[1.6] text-ink-700">
+            The engine is built for three people: a worker deciding whether to file a complaint,
+            a reporter deciding whether to call a source back, and an investigator deciding where
+            to spend a scarce subpoena. It will not tell you who is guilty. It will tell you who
+            is worth a second look, and why.
+          </p>
+          <div className="mt-8 flex flex-wrap items-baseline gap-x-8 gap-y-3">
+            <Link href="/search" className="btn btn-primary">
+              Start with a search
             </Link>
-            <Link
-              href="/violators"
-              className="btn inline-flex items-center gap-2 rounded-md border border-white/20 px-3.5 py-2 text-sm font-medium text-white hover:bg-white/10"
-            >
-              Browse known violators
+            <Link href="/violators" className="btn-text">
+              Read the enforcement record
             </Link>
-            <Link
-              href="/map"
-              className="btn inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium text-ink-200 hover:text-white"
-            >
-              See it on the map
+            <Link href="/methodology" className="btn-text">
+              How the score is computed
             </Link>
           </div>
+        </div>
 
-          <div className="mt-12 grid max-w-3xl grid-cols-2 gap-x-8 gap-y-6 md:grid-cols-4">
-            <HeroStat label="Employers tracked" value={compactNumber(stats.employers)} />
-            <HeroStat label="LCA filings" value={compactNumber(stats.filings)} />
-            <HeroStat
-              label="Flagged (score ≥ 50)"
-              value={compactNumber(stats.flagged)}
-              accent
-            />
-            <HeroStat
-              label="Back wages found"
-              value={stats.backWages ? compactCurrency(stats.backWages) : '—'}
-            />
+        <aside className="md:col-span-4">
+          <div className="border-t-2 border-ink-900 pt-3">
+            <div className="caps text-ink-500">As of today</div>
+            <dl className="mt-4 space-y-3 text-sm">
+              <LedeStat label="Employers indexed" value={compactNumber(stats.employers)} />
+              <LedeStat label="LCA filings" value={compactNumber(stats.filings)} />
+              <LedeStat
+                label="Flagged (score ≥ 50)"
+                value={compactNumber(stats.flagged)}
+                emphasis
+              />
+              <LedeStat
+                label="Resolved enforcement outcomes"
+                value={compactNumber(stats.violations)}
+              />
+              <LedeStat label="Back wages on record" value={compactCurrency(stats.backWages)} />
+            </dl>
           </div>
-        </div>
-      </section>
+        </aside>
+      </article>
 
-      {/* ---------- HOW IT WORKS ---------- */}
-      <section>
-        <div className="eyebrow">
-          <span className="h-px w-6 bg-ember-500" /> How it works
-        </div>
-        <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-ink-900 md:text-3xl">
-          Four steps from raw disclosure to filed complaint.
-        </h2>
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-4">
-          <StepCard
-            n={1}
-            title="Ingest"
-            body="We pull LCA disclosures, USCIS H-1B data, WHD enforcement records, BLS wages, and WARN layoff notices."
-          />
-          <StepCard
-            n={2}
-            title="Score"
-            body="Employers are scored on wage gaps, LCA volume, denial rates, address reuse, and other abuse signals."
-          />
-          <StepCard
-            n={3}
-            title="Map"
-            body="Entity relationships are resolved across shared addresses, officers, and trade-name aliases."
-          />
-          <StepCard
-            n={4}
-            title="Act"
-            body="One click generates a formatted DOL WH-4 / USCIS tip you can paste directly into the official form."
-          />
-        </div>
-      </section>
+      <hr className="hr-thick" />
 
       {/* ---------- TOP FLAGGED ---------- */}
       <section>
-        <div className="flex items-end justify-between">
-          <div>
-            <div className="eyebrow">
-              <span className="h-px w-6 bg-ember-500" /> Top anomalies
-            </div>
-            <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-ink-900 md:text-3xl">
-              Employers the engine is most worried about.
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm text-ink-600">
-              Ranked by composite anomaly score. Click any row to see filings, wage gaps, entity
-              links, and enforcement history.
-            </p>
-          </div>
-          <div className="hidden items-center gap-4 md:flex">
+        <header className="flex flex-wrap items-baseline justify-between gap-4">
+          <h2 className="font-serif">
+            The fifteen employers the engine is most worried about.
+          </h2>
+          <div className="flex items-baseline gap-6 text-sm">
             <Link
-              href={`/compare?ids=${top
-                .slice(0, 3)
-                .map((e) => e.id)
-                .join(',')}`}
-              className="text-sm font-medium text-ink-700 underline underline-offset-4 decoration-ember-500 decoration-2 hover:text-ember-600"
+              href={`/compare?ids=${top.slice(0, 3).map((e) => e.id).join(',')}`}
+              className="btn-text"
             >
-              Compare top 3 →
+              Compare the top three
             </Link>
-            <Link
-              href="/search"
-              className="text-sm font-medium text-ink-700 underline underline-offset-4 decoration-ember-500 decoration-2 hover:text-ember-600"
-            >
-              View all →
+            <Link href="/search" className="btn-text">
+              See the full index
             </Link>
           </div>
-        </div>
-        <div className="mt-6 overflow-hidden rounded-xl border border-ink-200 bg-white shadow-card">
-          <table className="data-table">
+        </header>
+        <p className="mt-3 max-w-[70ch] text-sm italic text-ink-600">
+          Ranked by composite anomaly score. A score is a lead, not a verdict — follow the row
+          through to the underlying filings.
+        </p>
+
+        <div className="mt-6 overflow-x-auto">
+          <table className="ledger">
             <thead>
               <tr>
-                <th className="w-10 text-right">#</th>
+                <th className="w-10">No.</th>
                 <th>Employer</th>
                 <th>State</th>
                 <th>NAICS</th>
                 <th className="text-right">LCAs</th>
                 <th>Severity</th>
+                <th className="w-20 text-right">Score</th>
               </tr>
             </thead>
             <tbody>
               {top.map((e, i) => {
                 const score = Number(e.anomaly_score);
                 return (
-                  <tr key={e.id} className="animate-fadeUp">
-                    <td className="num text-right text-ink-400">{String(i + 1).padStart(2, '0')}</td>
+                  <tr key={e.id}>
+                    <td className="num text-ink-400">{String(i + 1).padStart(2, '0')}</td>
                     <td>
-                      <Link href={`/employer/${e.id}`} className="font-medium text-ink-900 hover:text-ember-600">
+                      <Link href={`/employer/${e.id}`} className="link">
                         {e.name}
                       </Link>
                       {e.city && (
@@ -196,149 +159,77 @@ export default async function HomePage() {
                         </div>
                       )}
                     </td>
-                    <td className="text-ink-600">{e.state ?? '—'}</td>
-                    <td className="num text-ink-600">{e.naics_code ?? '—'}</td>
-                    <td className="num text-right text-ink-800">
+                    <td className="text-ink-700">{e.state ?? '—'}</td>
+                    <td className="num">{e.naics_code ?? '—'}</td>
+                    <td className="num text-right">
                       {e.total_lca_count?.toLocaleString() ?? '0'}
                     </td>
                     <td>
-                      <span className={`severity-badge ${severityClass(score)}`}>
-                        <span className={`severity-dot ${severityDotClass(score)}`} />
-                        {severityLabel(score)} · {score.toFixed(0)}
+                      <span className={`sev ${severityClass(score)}`}>
+                        <span className={`sev-mark ${severityMarkClass(score)}`} />
+                        {severityLabel(score)}
                       </span>
                     </td>
+                    <td className="num text-right">{score.toFixed(0)}</td>
                   </tr>
                 );
               })}
               {top.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-sm text-ink-500">
+                  <td colSpan={7} className="py-8 text-center text-sm text-ink-500">
                     No scored employers yet. Run{' '}
-                    <code className="rounded bg-ink-100 px-1.5 py-0.5 text-xs">
-                      python scripts/score.py run
-                    </code>{' '}
-                    to populate the engine.
+                    <code className="font-mono text-xs">python scripts/score.py run</code>.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <Link
-          href="/search"
-          className="mt-4 inline-flex text-sm font-medium text-ink-700 underline underline-offset-4 decoration-ember-500 decoration-2 hover:text-ember-600 md:hidden"
-        >
-          View all →
-        </Link>
       </section>
 
-      {/* ---------- WHY IT MATTERS ---------- */}
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <PullQuote
-          label="For workers"
-          body="Find out whether your employer has been underpaying, laying off Americans while hiring H-1B, or operating through undisclosed shell entities."
-        />
-        <PullQuote
-          label="For reporters"
-          body="Jump straight from a score to the underlying filings, wage comparisons, and entity network &mdash; with deep links you can cite."
-        />
-        <PullQuote
-          label="For enforcers"
-          body="Every investigation exports a pre-formatted DOL WH-4 / USCIS tip with the case evidence bundled in."
-        />
-      </section>
+      <hr className="hr-hair" />
 
-      {/* ---------- GUARDRAILS ---------- */}
-      <section className="rounded-2xl border border-ember-500/30 bg-gradient-to-br from-ember-50/70 to-transparent p-6 md:p-8">
-        <div className="flex flex-wrap items-start gap-6 md:flex-nowrap">
-          <div className="flex-1">
-            <div className="eyebrow">
-              <span className="h-px w-6 bg-ember-500" /> Use responsibly
-            </div>
-            <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-ink-900">
-              A score is a <em>lead</em>, not a verdict.
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-700">
-              Every number on this site comes from public filings, but an anomaly can have an
-              innocent explanation. Always verify against primary sources before naming an
-              employer, filing a complaint, or publishing a story. This tool is about
-              <em> employers and systems</em> &mdash; never about individual workers by name.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link href="/methodology" className="btn-outline">
-                Read the methodology →
-              </Link>
-              <a
-                href="https://github.com/andreykuzmin1994-blip/h-1b/issues/new?labels=data-report"
-                target="_blank"
-                rel="noreferrer"
-                className="btn-ghost"
-              >
-                Report a data error
-              </a>
-            </div>
-          </div>
-          <aside className="w-full max-w-xs shrink-0 rounded-xl border border-ink-200 bg-white p-5 shadow-card">
-            <div className="stat-label">What a score is</div>
-            <ul className="mt-3 space-y-2 text-[13px] leading-relaxed text-ink-700">
-              <li>
-                <span className="mr-2 text-lime-600">✓</span>
-                Weighted sum of public-data signals
-              </li>
-              <li>
-                <span className="mr-2 text-lime-600">✓</span>
-                Traceable to the filing that triggered it
-              </li>
-              <li>
-                <span className="mr-2 text-red-600">✗</span>
-                Not a legal finding
-              </li>
-              <li>
-                <span className="mr-2 text-red-600">✗</span>
-                Not a judgment about any individual
-              </li>
-            </ul>
-          </aside>
+      {/* ---------- GUARDRAILS (one line, in-line) ---------- */}
+      <aside className="md:grid md:grid-cols-12 md:gap-10">
+        <div className="md:col-span-3">
+          <div className="caps text-ink-500">A note to readers</div>
         </div>
-      </section>
+        <div className="md:col-span-9">
+          <p className="max-w-[65ch] text-[15px] leading-[1.6] text-ink-800">
+            Every figure comes from a public filing, but an anomaly can have an innocent
+            explanation. This tool is about employers and systems — never about individual
+            workers by name. Before naming a company in print or filing a complaint, read the
+            methodology and verify against primary sources.{' '}
+            <Link href="/methodology" className="link">
+              How the engine works
+            </Link>
+            .
+          </p>
+        </div>
+      </aside>
     </div>
   );
 }
 
-function HeroStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function LedeStat({
+  label,
+  value,
+  emphasis,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
   return (
-    <div>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-400">
-        {label}
-      </div>
-      <div
-        className={`mt-1 font-serif text-3xl font-semibold tracking-tight md:text-4xl ${
-          accent ? 'text-ember-400' : 'text-white'
+    <div className="flex items-baseline justify-between gap-4 border-b border-ink-100 pb-2 last:border-b-0">
+      <dt className="text-xs text-ink-600">{label}</dt>
+      <dd
+        className={`font-mono text-sm tabular ${
+          emphasis ? 'text-accent' : 'text-ink-900'
         }`}
       >
         {value}
-      </div>
+      </dd>
     </div>
-  );
-}
-
-function StepCard({ n, title, body }: { n: number; title: string; body: string }) {
-  return (
-    <div className="card relative">
-      <div className="font-mono text-xs text-ember-600">0{n}</div>
-      <div className="mt-2 font-serif text-lg font-semibold text-ink-900">{title}</div>
-      <p className="mt-1.5 text-sm leading-relaxed text-ink-600">{body}</p>
-    </div>
-  );
-}
-
-function PullQuote({ label, body }: { label: string; body: string }) {
-  return (
-    <figure className="relative rounded-xl border-l-4 border-ember-500 bg-white p-5 shadow-card">
-      <div className="stat-label">{label}</div>
-      <blockquote className="mt-2 font-serif text-lg leading-snug text-ink-900">
-        &ldquo;{body}&rdquo;
-      </blockquote>
-    </figure>
   );
 }
