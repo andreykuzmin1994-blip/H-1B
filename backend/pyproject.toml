@@ -39,6 +39,7 @@ h1b-ingest = "h1b_engine.ingest.cli:app"
 h1b-score = "h1b_engine.score.cli:app"
 h1b-graph = "h1b_engine.graph.cli:app"
 h1b-investigate = "h1b_engine.investigate.cli:app"
+h1b-personnel = "h1b_engine.credentials.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
