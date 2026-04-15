@@ -43,13 +43,19 @@ cd backend
 pip install -e .
 alembic upgrade head
 
-# Sprint 1: ingest data
+# Sprint 1a: fetch raw data (NEVER commit these — they're gitignored)
+#   The DOL OFLC LCA quarterly dumps are multi-GB; convert to Parquet to
+#   shrink 5-10x. The ingest pipeline reads .parquet natively.
+python scripts/download_data.py fetch --source lca --url <DOL_URL> --convert
+python scripts/download_data.py to-parquet --all      # bulk-convert existing CSVs
+
+# Sprint 1b: ingest data (auto-detects .parquet / .csv / .xlsx in data/raw/<source>/)
 python scripts/ingest.py lca --fiscal-year 2024
 python scripts/ingest.py uscis-hub --fiscal-year 2024
 python scripts/ingest.py whd-enforcement
 python scripts/ingest.py violators
 python scripts/ingest.py bls-oews --year 2024
-# WARN Act mass-layoff notices (state CSVs under data/raw/warn/<XX>/, or a single file)
+# WARN Act mass-layoff notices (state files under data/raw/warn/<XX>/, or a single file)
 python scripts/ingest.py warn
 
 # Sprint 2: score

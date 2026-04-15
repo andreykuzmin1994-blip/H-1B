@@ -17,8 +17,17 @@ from h1b_engine.ingest import (
     whd,
     willful_violators,
 )
-from h1b_engine.ingest.common import data_dir
+from h1b_engine.ingest.common import TABULAR_SUFFIXES, data_dir
 from h1b_engine.utils.logging import setup_logging
+
+
+def _globs(base: Path, recursive: bool = False) -> list[Path]:
+    """Return all tabular files under ``base`` sorted by name."""
+    globber = base.rglob if recursive else base.glob
+    results: list[Path] = []
+    for suffix in TABULAR_SUFFIXES:
+        results.extend(globber(f"*{suffix}"))
+    return sorted(results)
 
 app = typer.Typer(help="H-1B Transparency Engine ingestion CLI")
 console = Console()
@@ -42,15 +51,13 @@ def lca_cmd(
     if path:
         files.append(path)
     elif directory:
-        files.extend(sorted(directory.glob("*.xlsx")))
-        files.extend(sorted(directory.glob("*.csv")))
+        files.extend(_globs(directory))
     else:
         base = data_dir() / "raw" / "lca"
         if not base.exists():
             console.print(f"[yellow]No LCA files found. Drop files into {base}[/yellow]")
             raise typer.Exit(1)
-        files.extend(sorted(base.glob("*.xlsx")))
-        files.extend(sorted(base.glob("*.csv")))
+        files.extend(_globs(base))
 
     if not files:
         console.print("[red]No LCA files to ingest[/red]")
@@ -71,13 +78,13 @@ def uscis_hub_cmd(
     """Ingest USCIS H-1B Employer Data Hub file."""
     if not path:
         base = data_dir() / "raw" / "uscis_hub"
-        candidates = list(base.glob(f"*{fiscal_year}*.csv")) + list(
-            base.glob(f"*{fiscal_year}*.xlsx")
-        )
+        candidates: list[Path] = []
+        for suffix in TABULAR_SUFFIXES:
+            candidates.extend(base.glob(f"*{fiscal_year}*{suffix}"))
         if not candidates:
             console.print(f"[red]No USCIS file found for FY{fiscal_year} in {base}[/red]")
             raise typer.Exit(1)
-        path = candidates[0]
+        path = sorted(candidates)[0]
     n = uscis_hub.ingest_file(path, fiscal_year=fiscal_year)
     console.print(f"[green]USCIS hub ingest complete.[/green] {n} rows.")
 
@@ -90,7 +97,7 @@ def whd_enforcement_cmd(
     """Ingest DOL WHD enforcement CSV."""
     if not path:
         base = data_dir() / "raw" / "whd"
-        candidates = sorted(base.glob("*.csv"))
+        candidates = _globs(base)
         if not candidates:
             console.print(f"[red]No WHD files found in {base}[/red]")
             raise typer.Exit(1)
@@ -117,11 +124,13 @@ def bls_oews_cmd(
     """Ingest BLS OEWS wage benchmark file (Excel)."""
     if not path:
         base = data_dir() / "raw" / "bls"
-        candidates = list(base.glob(f"*{year}*.xlsx"))
+        candidates: list[Path] = []
+        for suffix in TABULAR_SUFFIXES:
+            candidates.extend(base.glob(f"*{year}*{suffix}"))
         if not candidates:
             console.print(f"[red]No BLS OEWS file found for {year} in {base}[/red]")
             raise typer.Exit(1)
-        path = candidates[0]
+        path = sorted(candidates)[0]
     n = bls_oews.ingest_file(path, year=year, area_type=area_type)
     console.print(f"[green]BLS OEWS ingest complete.[/green] {n} benchmarks.")
 
@@ -172,10 +181,7 @@ def warn_cmd(
     if path:
         files.append((path, state.upper() if state else None))
     elif directory:
-        for f in sorted(directory.rglob("*.csv")):
-            inferred = state or (f.parent.name.upper() if len(f.parent.name) == 2 else None)
-            files.append((f, inferred))
-        for f in sorted(directory.rglob("*.xlsx")):
+        for f in _globs(directory, recursive=True):
             inferred = state or (f.parent.name.upper() if len(f.parent.name) == 2 else None)
             files.append((f, inferred))
     else:
@@ -183,10 +189,7 @@ def warn_cmd(
         if not base.exists():
             console.print(f"[yellow]No WARN files found. Drop files into {base}[/yellow]")
             raise typer.Exit(1)
-        for f in sorted(base.rglob("*.csv")):
-            inferred = f.parent.name.upper() if len(f.parent.name) == 2 else None
-            files.append((f, inferred))
-        for f in sorted(base.rglob("*.xlsx")):
+        for f in _globs(base, recursive=True):
             inferred = f.parent.name.upper() if len(f.parent.name) == 2 else None
             files.append((f, inferred))
 

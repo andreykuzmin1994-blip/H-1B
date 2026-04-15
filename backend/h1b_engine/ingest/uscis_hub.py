@@ -13,7 +13,7 @@ import pandas as pd
 from sqlalchemy import select
 
 from h1b_engine.db.models import Employer, UscisEmployerStats
-from h1b_engine.ingest.common import ingestion_run
+from h1b_engine.ingest.common import ingestion_run, read_table
 from h1b_engine.utils import normalize_employer_name
 
 log = logging.getLogger(__name__)
@@ -72,12 +72,8 @@ def _str(value) -> str | None:
 
 
 def ingest_file(path: Path, fiscal_year: int) -> int:
-    """Ingest a USCIS Employer Data Hub file. Returns rows inserted."""
-    suffix = path.suffix.lower()
-    if suffix in {".xlsx", ".xls"}:
-        frame = pd.read_excel(path, dtype=object)
-    else:
-        frame = pd.read_csv(path, dtype=object, low_memory=False)
+    """Ingest a USCIS Employer Data Hub file (Parquet, CSV, or Excel)."""
+    frame = read_table(path)
     frame.columns = [str(c).strip().upper() for c in frame.columns]
 
     rows_out = 0

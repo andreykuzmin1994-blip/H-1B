@@ -31,7 +31,7 @@ import pandas as pd
 from sqlalchemy import select
 
 from h1b_engine.db.models import Employer, LayoffEvent
-from h1b_engine.ingest.common import ingestion_run
+from h1b_engine.ingest.common import ingestion_run, read_table
 from h1b_engine.utils import normalize_employer_name
 
 log = logging.getLogger(__name__)
@@ -326,13 +326,7 @@ def ingest_file(
     otherwise falls back to ``WARN_FEDERAL``. Use ``LAYOFFS_FYI`` explicitly for
     Layoffs.fyi export.
     """
-    suffix = path.suffix.lower()
-    if suffix in {".xlsx", ".xls"}:
-        frame = pd.read_excel(path, dtype=object)
-    elif suffix == ".csv":
-        frame = pd.read_csv(path, dtype=object, low_memory=False)
-    else:
-        raise ValueError(f"Unsupported WARN file format: {path.suffix}")
+    frame = read_table(path)
 
     resolved_source = source or (
         f"WARN_STATE_{default_state.upper()}" if default_state else "WARN_FEDERAL"

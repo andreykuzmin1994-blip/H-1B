@@ -18,7 +18,7 @@ import pandas as pd
 from sqlalchemy import select
 
 from h1b_engine.db.models import Employer, LcaFiling
-from h1b_engine.ingest.common import chunked, ingestion_run
+from h1b_engine.ingest.common import chunked, ingestion_run, read_table
 from h1b_engine.utils import annualize_wage, normalize_employer_name
 
 log = logging.getLogger(__name__)
@@ -184,14 +184,13 @@ def normalize_row(raw: dict, fiscal_year: int | None = None) -> LcaRow | None:
 
 
 def read_file(path: Path) -> Iterator[dict]:
-    """Iterate over rows of an LCA disclosure file (Excel or CSV)."""
-    suffix = path.suffix.lower()
-    if suffix in {".xlsx", ".xls"}:
-        frame = pd.read_excel(path, dtype=object)
-    elif suffix == ".csv":
-        frame = pd.read_csv(path, dtype=object, low_memory=False)
-    else:
-        raise ValueError(f"Unsupported LCA file format: {path.suffix}")
+    """Iterate over rows of an LCA disclosure file (Parquet, CSV, or Excel).
+
+    Parquet is strongly preferred for the DOL quarterly dumps: a 3 GB CSV
+    typically compresses to ~300 MB of Parquet with no data loss. See
+    ``scripts/download_data.py`` for the CSV -> Parquet conversion helper.
+    """
+    frame = read_table(path)
     frame.columns = [str(c).strip().upper() for c in frame.columns]
     for record in frame.to_dict(orient="records"):
         yield record

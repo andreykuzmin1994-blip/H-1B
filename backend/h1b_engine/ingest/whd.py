@@ -16,7 +16,7 @@ import requests
 from sqlalchemy import select
 
 from h1b_engine.db.models import Employer, Violation
-from h1b_engine.ingest.common import ingestion_run
+from h1b_engine.ingest.common import ingestion_run, read_table
 from h1b_engine.utils import normalize_employer_name
 
 log = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ def _is_h1b_related(row: dict) -> bool:
 
 
 def ingest_file(path: Path, h1b_only: bool = True) -> int:
-    frame = pd.read_csv(path, dtype=object, low_memory=False)
+    frame = read_table(path)
     frame.columns = [str(c).strip().upper() for c in frame.columns]
     rows_out = 0
 

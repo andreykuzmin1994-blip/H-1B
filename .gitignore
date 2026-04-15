@@ -35,10 +35,13 @@ tsconfig.tsbuildinfo
 # Prisma
 frontend/prisma/generated/
 
-# Data artifacts
+# Data artifacts - never commit raw source data; fetch via scripts/download_data.py
+data/
 backend/data/raw/
 backend/data/processed/
 backend/data/cache/
+*.parquet
+*.csv.gz
 reports/*.txt
 reports/*.pdf
 reports/*.json

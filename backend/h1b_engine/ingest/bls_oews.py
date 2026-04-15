@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 from h1b_engine.db.models import SocWageBenchmark
-from h1b_engine.ingest.common import ingestion_run
+from h1b_engine.ingest.common import ingestion_run, read_table
 
 log = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def _to_str(value) -> str | None:
 
 
 def ingest_file(path: Path, year: int, area_type: str = "NATIONAL") -> int:
-    frame = pd.read_excel(path, dtype=object)
+    frame = read_table(path)
     frame.columns = [str(c).strip().upper() for c in frame.columns]
 
     rows_out = 0
