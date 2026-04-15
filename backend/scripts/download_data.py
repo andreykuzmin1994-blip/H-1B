@@ -140,6 +140,12 @@ def _convert_one(path: Path, replace: bool = False) -> Path:
         frame = pd.read_excel(path, dtype=object)
     # Normalize columns to strings so Parquet's schema is stable across files.
     frame.columns = [str(c) for c in frame.columns]
+    # Force every column to nullable-string dtype. Otherwise pyarrow tries to
+    # infer numeric types from mostly-numeric columns and blows up on sentinel
+    # values (e.g. BLS OEWS uses '*' / '**' / '#' to mean "value withheld" in
+    # H_MEAN / A_MEAN / etc). The ingesters do their own per-field coercion,
+    # so keeping everything as strings on disk is lossless for our pipeline.
+    frame = frame.astype("string")
     frame.to_parquet(out, compression="snappy", index=False)
 
     src_size = path.stat().st_size
@@ -180,8 +186,19 @@ def to_parquet_cmd(
         console.print("[yellow]Nothing to convert[/yellow]")
         raise typer.Exit(0)
 
+    # Convert files independently: a single bad file (unexpected schema, odd
+    # encoding, etc.) shouldn't kill a multi-GB batch. Report failures at the
+    # end so the user can re-run or investigate the few that didn't make it.
+    failed: list[tuple[Path, str]] = []
     for p in sorted(set(targets)):
-        _convert_one(p, replace=replace)
+        try:
+            _convert_one(p, replace=replace)
+        except Exception as exc:  # noqa: BLE001
+            console.print(f"[red]Failed[/red] {p.name}: {exc}")
+            failed.append((p, str(exc)))
+    if failed:
+        console.print(f"[red]{len(failed)} file(s) failed; the rest were converted.[/red]")
+        raise typer.Exit(1)
     console.print("[green]Done.[/green]")
 
 
