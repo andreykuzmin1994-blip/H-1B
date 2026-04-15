@@ -1,0 +1,15 @@
+DOL Wage & Hour Division enforcement CSVs.
+
+Source: https://enforcedata.dol.gov/views/data_summary.php
+
+Recognized columns (see backend/h1b_engine/ingest/whd.py::ingest_file):
+  LEGAL_NAME / TRADE_NM / EMPLOYER_NAME, ST_CD / STATE,
+  ACT_ID_DESC / VIOLATION_TYPE,
+  FINDINGS_END_DATE / CONCLUSION_DATE,
+  BW_ATP_AMT / BACK_WAGES, CMP_ASSD_AMT / PENALTY,
+  CASE_VIOLTN_CNT_DESC / DESCRIPTION
+
+By default only H-1B / INA-related violations are kept. Use --all to import
+every violation type.
+
+Run:  python scripts/ingest.py whd-enforcement

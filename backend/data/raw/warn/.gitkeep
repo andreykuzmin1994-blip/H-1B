@@ -1,0 +1,18 @@
+WARN Act mass-layoff notice CSVs. Organize by 2-letter state code:
+
+  data/raw/warn/CA/ca_warn_2024.csv
+  data/raw/warn/NY/ny_warn_2024.csv
+  data/raw/warn/TX/tx_warn_2024.csv
+
+When a file sits directly under `warn/` the ingester falls back to
+WARN_FEDERAL; a 2-letter subdirectory name is inferred as the state.
+
+Recognized columns (see backend/h1b_engine/ingest/warn.py::COLUMN_ALIASES):
+  Company / Employer / Business,
+  Notice Date / WARN Date / Received Date,
+  Effective Date / Layoff Date / Separation Date,
+  Workers Affected / Employees Affected / Number Affected,
+  City, State, Zip, Reason / Closing Type, Industry / NAICS,
+  Case Number / WARN Number / Notice ID
+
+Run:  python scripts/ingest.py warn

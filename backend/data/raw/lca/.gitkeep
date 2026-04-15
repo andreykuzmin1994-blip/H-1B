@@ -1,0 +1,16 @@
+DOL OFLC LCA disclosure files. Drop .xlsx or .csv here; include the fiscal
+year in the filename (e.g. LCA_Disclosure_Data_FY2024_Q4.xlsx).
+
+Source: https://www.dol.gov/agencies/eta/foreign-labor/performance
+
+Recognized columns (see backend/h1b_engine/ingest/lca.py::COLUMN_MAP for the
+full list of aliases):
+  CASE_NUMBER, CASE_STATUS, VISA_CLASS,
+  EMPLOYER_NAME, EMPLOYER_ADDRESS1, EMPLOYER_CITY, EMPLOYER_STATE, EMPLOYER_POSTAL_CODE,
+  NAICS_CODE, SOC_CODE, SOC_TITLE, JOB_TITLE,
+  WAGE_RATE_OF_PAY_FROM, WAGE_UNIT_OF_PAY, PREVAILING_WAGE, PW_UNIT_OF_PAY, PW_WAGE_LEVEL,
+  WORKSITE_CITY, WORKSITE_STATE, WORKSITE_POSTAL_CODE,
+  SECONDARY_ENTITY_BUSINESS_NAME, TOTAL_WORKER_POSITIONS,
+  RECEIVED_DATE, DECISION_DATE
+
+Run:  python scripts/ingest.py lca --fiscal-year 2024

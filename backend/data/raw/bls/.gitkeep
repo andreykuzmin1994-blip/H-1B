@@ -1,0 +1,11 @@
+BLS OEWS wage benchmark Excel files. Filename must contain the data year.
+
+Source: https://www.bls.gov/oes/tables.htm (look for "All data" national xlsx,
+e.g. national_M2024_dl.xlsx)
+
+Recognized columns (see backend/h1b_engine/ingest/bls_oews.py::COLUMN_MAP):
+  OCC_CODE / SOC_CODE, OCC_TITLE, TOT_EMP,
+  A_MEAN, A_MEDIAN, A_PCT10, A_PCT25, A_PCT75, A_PCT90,
+  AREA, AREA_TITLE / AREA_NAME, PRIM_STATE
+
+Run:  python scripts/ingest.py bls-oews --year 2024

@@ -1,0 +1,12 @@
+USCIS H-1B Employer Data Hub files. Drop .csv or .xlsx here; include the
+fiscal year in the filename (e.g. H1B_FY2024.csv).
+
+Source: https://www.uscis.gov/tools/reports-and-studies/h-1b-employer-data-hub
+
+Recognized columns (see backend/h1b_engine/ingest/uscis_hub.py::COLUMN_MAP):
+  Employer (Petitioner) Name, Tax ID, NAICS Code,
+  Petitioner City, Petitioner State, Petitioner Zip Code,
+  Initial Approval, Initial Denial, Continuing Approval, Continuing Denial,
+  Line by Line, Fiscal Year
+
+Run:  python scripts/ingest.py uscis-hub --fiscal-year 2024

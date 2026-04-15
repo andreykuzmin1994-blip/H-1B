@@ -1,0 +1,4 @@
+Employer (Petitioner) Name,Tax ID,Fiscal Year,Initial Approval,Initial Denial,Continuing Approval,Continuing Denial,NAICS Code,Petitioner City,Petitioner State,Petitioner Zip Code,Line by Line
+Acme Smoke Test LLC,111111111,2024,4,2,3,0,541511,Atlanta,GA,30303,EMPLOYER
+Globex Staffing Corp,222222222,2024,18,14,6,2,541512,San Francisco,CA,94105,EMPLOYER
+Wayne Enterprises Inc,333333333,2024,12,0,25,0,541511,New York,NY,10017,EMPLOYER

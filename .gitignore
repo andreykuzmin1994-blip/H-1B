@@ -36,9 +36,12 @@ tsconfig.tsbuildinfo
 frontend/prisma/generated/
 
 # Data artifacts
-backend/data/raw/
+backend/data/raw/**
 backend/data/processed/
 backend/data/cache/
+!backend/data/raw/
+!backend/data/raw/*/
+!backend/data/raw/**/.gitkeep
 reports/*.txt
 reports/*.pdf
 reports/*.json

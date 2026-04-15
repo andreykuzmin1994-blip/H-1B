@@ -1,0 +1,3 @@
+LEGAL_NAME,TRADE_NM,ST_CD,ACT_ID_DESC,FINDINGS_END_DATE,BW_ATP_AMT,CMP_ASSD_AMT,CASE_VIOLTN_CNT_DESC
+Acme Smoke Test LLC,Acme Smoke Test,GA,H1B Wage Violation,2024-05-01,45000,12500,Back wages owed for H-1B underpayment
+Globex Staffing Corp,Globex,CA,H1B Benching,2024-06-15,32000,8000,Failure to pay wages during non-productive status (H-1B)

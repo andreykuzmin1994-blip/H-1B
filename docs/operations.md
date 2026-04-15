@@ -26,7 +26,20 @@ cp .env.example .env   # edit DATABASE_URL + API keys as needed
 alembic upgrade head
 ```
 
-## 3. Ingest data
+## 3. Smoke test (optional but recommended)
+
+Before dropping real data, verify the pipeline wiring against the synthetic
+three-employer fixture set:
+
+```bash
+make smoke           # from backend/
+# or: python scripts/smoke_test.py
+```
+
+This uses a throw-away SQLite database (no Postgres needed), runs ingest →
+score → graph → score, and prints row counts and flagged employers.
+
+## 4. Ingest data
 
 Drop raw files into the expected directories (auto-created on first use):
 
@@ -54,7 +67,7 @@ python scripts/ingest.py geocode --limit 5000
 python scripts/ingest.py opencorporates --limit 5000   # requires API key
 ```
 
-## 4. Score + graph
+## 5. Score + graph
 
 ```bash
 python scripts/score.py run
@@ -62,7 +75,7 @@ python scripts/graph.py build-all
 python scripts/score.py run   # re-run so CONNECTED_TO_VIOLATOR uses new edges
 ```
 
-## 5. Investigate flagged employers
+## 6. Investigate flagged employers
 
 ```bash
 # Single employer
@@ -72,7 +85,7 @@ python scripts/investigate.py run --employer-id 123 --output report
 python scripts/investigate.py run --min-score 50 --output report --out-dir ../reports
 ```
 
-## 6. Run the web dashboard
+## 7. Run the web dashboard
 
 ```bash
 cd ../frontend

@@ -20,8 +20,11 @@ backend/                  Python data pipeline + scoring + investigation engine
     investigate/          AutoResearch investigation framework
     credentials/          Personnel Look-Up / credential verification tool
     utils/                Shared helpers (wage normalization, name normalization)
+  data/
+    raw/<source>/         Drop zone for ingest inputs (gitignored)
+    fixtures/smoke/       Synthetic fixtures used by `make smoke`
   migrations/             Alembic migrations
-  scripts/                CLI entrypoints (ingest.py, score.py, graph.py, investigate.py, personnel.py)
+  scripts/                CLI entrypoints (ingest.py, score.py, graph.py, investigate.py, personnel.py, smoke_test.py)
   tests/                  Unit tests
 frontend/                 Next.js 14 (App Router) web dashboard
   app/                    Routes
@@ -43,6 +46,9 @@ docker compose -f docker/docker-compose.yml up -d
 cd backend
 pip install -e .
 alembic upgrade head
+
+# Verify the pipeline wiring against synthetic fixtures (SQLite, no Postgres)
+make smoke
 
 # Sprint 1: ingest data
 python scripts/ingest.py lca --fiscal-year 2024
