@@ -118,6 +118,62 @@ ANOMALY_FLAGS: dict[str, FlagDefinition] = {
             "industry/reason signal"
         ),
     ),
+    "MULTI_REGISTRATION_SAME_BENEFICIARY": FlagDefinition(
+        type="MULTI_REGISTRATION_SAME_BENEFICIARY",
+        severity="CRITICAL",
+        score=40,
+        description=(
+            "Same beneficiary registered in the same cap season by this "
+            "employer and at least one unrelated petitioner (per USCIS "
+            "beneficiary-centric selection rule, 8 CFR 214.2(h)(8)(iii))"
+        ),
+    ),
+    "COMMON_AGENT_CLUSTER": FlagDefinition(
+        type="COMMON_AGENT_CLUSTER",
+        severity="CRITICAL",
+        score=35,
+        description=(
+            "3+ petitioners share the same registered agent and business "
+            "address (industrialized shell-employer cluster pattern)"
+        ),
+    ),
+    "OFFICER_PRIOR_VISA_INDICTMENT": FlagDefinition(
+        type="OFFICER_PRIOR_VISA_INDICTMENT",
+        severity="CRITICAL",
+        score=40,
+        description=(
+            "Corporate officer named in a prior DOJ/ICE/USCIS visa-fraud "
+            "indictment or settlement"
+        ),
+    ),
+    "NO_PAYROLL_FOR_H1B_VOLUME": FlagDefinition(
+        type="NO_PAYROLL_FOR_H1B_VOLUME",
+        severity="CRITICAL",
+        score=40,
+        description=(
+            "USCIS approval count materially exceeds the employer's state "
+            "UI / QCEW / Form 941 worker count for the same year (ghost "
+            "employer pattern per DHS OIG-18-03)"
+        ),
+    ),
+    "PREPARER_ON_EOIR_DISCIPLINE_LIST": FlagDefinition(
+        type="PREPARER_ON_EOIR_DISCIPLINE_LIST",
+        severity="CRITICAL",
+        score=35,
+        description=(
+            "G-28 attorney / preparer of record appears on EOIR's "
+            "Currently Disciplined Practitioners list"
+        ),
+    ),
+    "DOL_BENCHING_COMPLAINT_HISTORY": FlagDefinition(
+        type="DOL_BENCHING_COMPLAINT_HISTORY",
+        severity="HIGH",
+        score=30,
+        description=(
+            "Prior DOL Wage and Hour Division finding of benching / "
+            "nonproductive-status wage violation under 20 CFR 655.731"
+        ),
+    ),
 }
 
 # 90-day non-displacement window from INA section 212(n)(1)(E).
@@ -190,4 +246,30 @@ RELATIONSHIP_WEIGHTS: dict[str, float] = {
 BUSINESS_PARK_KEYWORDS: tuple[str, ...] = (
     "BUSINESS PARK", "INDUSTRIAL PARK", "CORPORATE CENTER",
     "OFFICE PARK", "TECHNOLOGY PARK",
+)
+
+# Minimum cluster size for the COMMON_AGENT_CLUSTER detector.
+COMMON_AGENT_CLUSTER_THRESHOLD: int = 3
+
+# Minimum USCIS initial-approval volume before we even evaluate the
+# NO_PAYROLL_FOR_H1B_VOLUME detector (below this we have too little signal).
+PAYROLL_GAP_MIN_APPROVALS: int = 5
+
+# Ratio of (H-1B approvals / reported workers) that triggers the payroll-gap
+# flag. 1.5 captures ghost employers where approvals structurally exceed
+# the rest of the workforce.
+PAYROLL_GAP_RATIO: float = 1.5
+
+# Substring tokens used to match DOL WHD violation rows for the benching /
+# nonproductive-status pattern. Matched case-insensitively against the
+# ``violation_type`` and ``description`` fields.
+BENCHING_VIOLATION_TOKENS: tuple[str, ...] = (
+    "BENCH",
+    "NONPRODUCTIVE",
+    "NON-PRODUCTIVE",
+    "UNPAID WAGES",
+    "REQUIRED WAGE",
+    "WH-4",
+    "WH4",
+    "FAILURE TO PAY",
 )

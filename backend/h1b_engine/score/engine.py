@@ -12,8 +12,13 @@ from h1b_engine.db.base import get_session
 from h1b_engine.db.models import Employer
 from h1b_engine.score.detectors import (
     compute_address_clusters,
+    compute_agent_clusters,
+    compute_disciplined_attorneys,
+    compute_fraud_defendant_names,
+    compute_multi_registered_beneficiaries,
     compute_naics_soc_frequency,
     compute_national_soc_medians,
+    compute_payroll_by_employer_year,
     compute_soc_denial_rates,
     compute_violator_employer_ids,
     detect_for_employer,
@@ -32,12 +37,23 @@ def score_all(employer_ids: Iterable[int] | None = None, min_filings: int = 0) -
         soc_medians = compute_national_soc_medians(session)
         soc_denial_rates = compute_soc_denial_rates(session)
         violator_ids = compute_violator_employer_ids(session)
+        multi_registrations = compute_multi_registered_beneficiaries(session)
+        agent_clusters = compute_agent_clusters(session)
+        fraud_defendants = compute_fraud_defendant_names(session)
+        disciplined_attorneys = compute_disciplined_attorneys(session)
+        payroll_by_year = compute_payroll_by_employer_year(session)
         log.info(
-            "Context: %d NAICS, %d address clusters, %d SOC medians, %d violators",
+            "Context: %d NAICS, %d address clusters, %d SOC medians, "
+            "%d violators, %d multi-reg employers, %d agent clusters, "
+            "%d fraud defendants, %d disciplined attorneys",
             len(naics_soc_freq),
             len(address_clusters),
             len(soc_medians),
             len(violator_ids),
+            len(multi_registrations),
+            len(agent_clusters),
+            len(fraud_defendants),
+            len(disciplined_attorneys),
         )
 
         stmt = select(Employer)
@@ -56,6 +72,11 @@ def score_all(employer_ids: Iterable[int] | None = None, min_filings: int = 0) -
                 soc_medians=soc_medians,
                 soc_denial_rates=soc_denial_rates,
                 violator_ids=violator_ids,
+                multi_registrations=multi_registrations,
+                agent_clusters=agent_clusters,
+                fraud_defendants=fraud_defendants,
+                disciplined_attorneys=disciplined_attorneys,
+                payroll_by_year=payroll_by_year,
             )
             persist_flags(session, employer, outputs)
             count += 1

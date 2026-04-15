@@ -312,6 +312,38 @@ def _recommendations(flags, lca, wages, violations, personnel=None) -> list[str]
             "H-1B occupation overlaps the job family affected by the "
             "concurrent layoff"
         )
+    if "MULTI_REGISTRATION_SAME_BENEFICIARY" in flag_types:
+        recs.append(
+            "Same beneficiary registered across unrelated petitioners in "
+            "the same cap season (beneficiary-centric selection integrity "
+            "violation, 8 CFR 214.2(h)(8)(iii))"
+        )
+    if "COMMON_AGENT_CLUSTER" in flag_types:
+        recs.append(
+            "Petitioner sits inside an industrialized shell-employer "
+            "cluster sharing registered agent and business address with "
+            "3+ other petitioners"
+        )
+    if "OFFICER_PRIOR_VISA_INDICTMENT" in flag_types:
+        recs.append(
+            "Corporate officer previously named in a DOJ/ICE visa-fraud "
+            "enforcement action"
+        )
+    if "NO_PAYROLL_FOR_H1B_VOLUME" in flag_types:
+        recs.append(
+            "USCIS H-1B approval volume exceeds employer's reported "
+            "payroll footprint (ghost-employer pattern per DHS OIG-18-03)"
+        )
+    if "PREPARER_ON_EOIR_DISCIPLINE_LIST" in flag_types:
+        recs.append(
+            "G-28 attorney of record appears on EOIR's Currently "
+            "Disciplined Practitioners list"
+        )
+    if "DOL_BENCHING_COMPLAINT_HISTORY" in flag_types:
+        recs.append(
+            "Prior DOL Wage and Hour Division finding of benching / "
+            "nonproductive-status wage violation (20 CFR 655.731)"
+        )
     # Credential / personnel flags surface under the I-129 fraud-indicator
     # narrative (8 CFR 214.2(h)(4)(iii)(C) specialty-occupation proof, and
     # 18 U.S.C. section 1546 fraud/misuse of visa documents).

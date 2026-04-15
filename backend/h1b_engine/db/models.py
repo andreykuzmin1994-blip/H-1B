@@ -73,6 +73,11 @@ class LcaFiling(Base):
     soc_code: Mapped[str | None] = mapped_column(String(10), index=True)
     soc_title: Mapped[str | None] = mapped_column(String(500))
     job_title: Mapped[str | None] = mapped_column(String(500))
+    attorney_name: Mapped[str | None] = mapped_column(String(500))
+    attorney_name_normalized: Mapped[str | None] = mapped_column(
+        String(500), index=True
+    )
+    attorney_firm: Mapped[str | None] = mapped_column(String(500))
     wage_from: Mapped[float | None] = mapped_column(Numeric(12, 2))
     wage_unit: Mapped[str | None] = mapped_column(String(20))
     wage_annualized: Mapped[float | None] = mapped_column(Numeric(12, 2))
@@ -502,6 +507,138 @@ class CredentialClaim(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     beneficiary: Mapped[Beneficiary] = relationship(back_populates="claims")
+
+
+class H1BRegistration(Base):
+    """USCIS H-1B lottery registration record.
+
+    A single cap-season registration is upstream of the I-129 petition. Under
+    the February 2024 final rule, USCIS selects uniquely by beneficiary
+    across petitioners, so the same beneficiary identity appearing on
+    multiple unrelated petitioners' registrations in one cap season is a
+    per-se integrity signal (8 CFR 214.2(h)(8)(iii)).
+    """
+
+    __tablename__ = "h1b_registrations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    employer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("employers.id", ondelete="SET NULL"), index=True
+    )
+    employer_name_raw: Mapped[str | None] = mapped_column(String(500))
+    cap_fiscal_year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    beneficiary_full_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    beneficiary_name_normalized: Mapped[str] = mapped_column(
+        String(500), nullable=False, index=True
+    )
+    beneficiary_date_of_birth: Mapped[date | None] = mapped_column(Date)
+    passport_last4: Mapped[str | None] = mapped_column(String(4))
+    passport_country: Mapped[str | None] = mapped_column(String(100))
+    status: Mapped[str | None] = mapped_column(
+        String(30)
+    )  # SUBMITTED | SELECTED | NOT_SELECTED | WITHDRAWN | DENIED
+    source: Mapped[str] = mapped_column(String(50), default="USCIS_REGISTRATION")
+    source_url: Mapped[str | None] = mapped_column(String(1000))
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index(
+            "idx_reg_beneficiary_year",
+            "beneficiary_name_normalized",
+            "beneficiary_date_of_birth",
+            "cap_fiscal_year",
+        ),
+        Index(
+            "idx_reg_passport_year",
+            "passport_country",
+            "passport_last4",
+            "cap_fiscal_year",
+        ),
+    )
+
+
+class KnownFraudDefendant(Base):
+    """Named individuals/entities from DOJ/ICE/USCIS visa-fraud actions.
+
+    Populated from press-release NER. Referenced by the
+    OFFICER_PRIOR_VISA_INDICTMENT detector against ``SosEntity.officers``.
+    """
+
+    __tablename__ = "known_fraud_defendants"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    full_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    name_normalized: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    role: Mapped[str | None] = mapped_column(
+        String(50)
+    )  # DEFENDANT | CO_CONSPIRATOR | CORPORATE
+    case_id: Mapped[str | None] = mapped_column(String(200))
+    case_title: Mapped[str | None] = mapped_column(String(500))
+    case_date: Mapped[date | None] = mapped_column(Date)
+    agency: Mapped[str | None] = mapped_column(String(50))  # DOJ | ICE | USCIS | STATE_AG
+    jurisdiction: Mapped[str | None] = mapped_column(String(100))
+    offense_category: Mapped[str | None] = mapped_column(String(100))
+    source: Mapped[str] = mapped_column(String(50), default="DOJ_PRESS_RELEASE")
+    source_url: Mapped[str | None] = mapped_column(String(1000))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class DisciplinedPractitioner(Base):
+    """Attorneys/preparers on EOIR's Currently Disciplined Practitioners list.
+
+    Scraped from justice.gov/eoir/list-of-currently-disciplined-practitioners.
+    Matched against ``LcaFiling.attorney_name_normalized``.
+    """
+
+    __tablename__ = "disciplined_practitioners"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    full_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    name_normalized: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    bar_id: Mapped[str | None] = mapped_column(String(50))
+    jurisdiction: Mapped[str | None] = mapped_column(String(100))
+    discipline_type: Mapped[str | None] = mapped_column(
+        String(100)
+    )  # SUSPENSION | DISBARMENT | INTERIM_SUSPENSION | EXPULSION
+    effective_date: Mapped[date | None] = mapped_column(Date)
+    reinstatement_date: Mapped[date | None] = mapped_column(Date)
+    source: Mapped[str] = mapped_column(String(50), default="EOIR")
+    source_url: Mapped[str | None] = mapped_column(String(1000))
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class EmployerPayrollRecord(Base):
+    """Employer payroll footprint sourced from QCEW / UI / Form 941 aggregates.
+
+    Used by the NO_PAYROLL_FOR_H1B_VOLUME detector to identify "ghost"
+    petitioners whose USCIS H-1B approval volume dwarfs their reported
+    workforce (DHS OIG-18-03).
+    """
+
+    __tablename__ = "employer_payroll_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    employer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("employers.id", ondelete="CASCADE"), index=True
+    )
+    fiscal_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(
+        String(30), nullable=False
+    )  # QCEW | STATE_UI | FORM_941 | D_AND_B
+    worker_count: Mapped[int | None] = mapped_column(Integer)
+    total_wages: Mapped[float | None] = mapped_column(Numeric(14, 2))
+    source_url: Mapped[str | None] = mapped_column(String(1000))
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint(
+            "employer_id", "fiscal_year", "source", name="uq_payroll_emp_year_source"
+        ),
+    )
 
 
 class CredentialFlag(Base):
