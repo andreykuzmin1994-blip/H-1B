@@ -150,9 +150,23 @@ export default async function HomePage() {
               links, and enforcement history.
             </p>
           </div>
-          <Link href="/search" className="hidden text-sm font-medium text-ink-700 underline underline-offset-4 decoration-ember-500 decoration-2 hover:text-ember-600 md:inline">
-            View all →
-          </Link>
+          <div className="hidden items-center gap-4 md:flex">
+            <Link
+              href={`/compare?ids=${top
+                .slice(0, 3)
+                .map((e) => e.id)
+                .join(',')}`}
+              className="text-sm font-medium text-ink-700 underline underline-offset-4 decoration-ember-500 decoration-2 hover:text-ember-600"
+            >
+              Compare top 3 →
+            </Link>
+            <Link
+              href="/search"
+              className="text-sm font-medium text-ink-700 underline underline-offset-4 decoration-ember-500 decoration-2 hover:text-ember-600"
+            >
+              View all →
+            </Link>
+          </div>
         </div>
         <div className="mt-6 overflow-hidden rounded-xl border border-ink-200 bg-white shadow-card">
           <table className="data-table">

@@ -158,13 +158,14 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
                 <th>NAICS</th>
                 <th className="text-right">LCAs</th>
                 <th>Severity</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {results.map((e) => {
                 const score = Number(e.anomaly_score);
                 return (
-                  <tr key={e.id}>
+                  <tr key={e.id} className="group">
                     <td>
                       <Link href={`/employer/${e.id}`} className="font-medium text-ink-900 hover:text-ember-600">
                         {e.name}
@@ -182,12 +183,20 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
                         {severityLabel(score)} · {score.toFixed(0)}
                       </span>
                     </td>
+                    <td className="text-right">
+                      <Link
+                        href={`/compare?ids=${e.id}`}
+                        className="text-xs text-ink-400 opacity-0 transition group-hover:opacity-100 hover:text-ember-600"
+                      >
+                        + compare
+                      </Link>
+                    </td>
                   </tr>
                 );
               })}
               {results.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-sm text-ink-500">
+                  <td colSpan={6} className="py-8 text-center text-sm text-ink-500">
                     No matches. Try loosening your filters.
                   </td>
                 </tr>

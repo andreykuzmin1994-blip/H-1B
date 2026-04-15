@@ -12,6 +12,7 @@ import { WageChart } from '@/components/WageChart';
 import { AnomalyFlagList } from '@/components/AnomalyFlagList';
 import { EntityGraph } from '@/components/EntityGraph';
 import { EmployerCharts } from '@/components/EmployerCharts';
+import { ShareButton } from '@/components/ShareButton';
 
 export const revalidate = 60;
 
@@ -201,6 +202,15 @@ export default async function EmployerPage({ params }: { params: { id: string } 
             <Link href={`/tip/${employer.id}`} className="btn-accent">
               Generate enforcement tip →
             </Link>
+            <div className="flex w-full items-center justify-end gap-2">
+              <Link
+                href={`/compare?ids=${employer.id}`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10"
+              >
+                + Add to compare
+              </Link>
+              <ShareButton path={`/employer/${employer.id}`} />
+            </div>
           </div>
         </div>
       </section>
