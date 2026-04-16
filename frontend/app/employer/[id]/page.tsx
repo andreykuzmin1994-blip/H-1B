@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import {
   formatCurrency,
@@ -32,10 +33,9 @@ const LAYOFF_WINDOW_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function loadGraph(id: number) {
-  const rows = await prisma.$queryRawUnsafe<any[]>(
-    `
+  const rows = await prisma.$queryRaw<Array<{ id: number | bigint; depth: number | bigint }>>(Prisma.sql`
     WITH RECURSIVE reachable(id, depth) AS (
-        SELECT $1::int, 0
+        SELECT ${id}::int, 0
       UNION
         SELECT CASE WHEN er.employer_id_a = r.id THEN er.employer_id_b ELSE er.employer_id_a END,
                r.depth + 1
@@ -44,10 +44,8 @@ async function loadGraph(id: number) {
          WHERE r.depth < 2
     )
     SELECT DISTINCT id, depth FROM reachable
-    `,
-    id,
-  );
-  const ids = rows.map((r: any) => Number(r.id));
+  `);
+  const ids = rows.map((r) => Number(r.id));
   if (ids.length === 0) return { nodes: [], edges: [] };
   const employers = await prisma.employer.findMany({ where: { id: { in: ids } } });
   const edges = await prisma.entityRelationship.findMany({

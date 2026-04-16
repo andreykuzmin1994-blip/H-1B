@@ -13,7 +13,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 def _database_url() -> str:
     return os.environ.get(
         "DATABASE_URL",
-        "postgresql+psycopg2://h1b:h1b@localhost:5432/h1b_engine",
+        "postgresql+psycopg2://h1b:change-me-locally@localhost:5432/h1b_engine",
     )
 
 

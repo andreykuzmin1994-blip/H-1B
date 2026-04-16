@@ -12,8 +12,12 @@ Engine.
 
 ## 1. Bring up PostgreSQL
 
+The compose file now hard-fails if `POSTGRES_USER` / `POSTGRES_PASSWORD` are
+unset, and binds Postgres to `127.0.0.1` only (not reachable from the network).
+
 ```bash
-docker compose -f docker/docker-compose.yml up -d
+cp docker/.env.example docker/.env   # edit POSTGRES_PASSWORD before first run
+docker compose -f docker/docker-compose.yml --env-file docker/.env up -d
 ```
 
 ## 2. Install backend + run migrations
@@ -83,6 +87,16 @@ npm run dev
 ```
 
 Navigate to http://localhost:3000.
+
+## Rate limiting
+
+The public `/api/v1/*` endpoints are rate-limited per IP. Defaults: 60 requests
+per minute, sliding window. Override via `RATELIMIT_MAX` / `RATELIMIT_WINDOW`
+(Upstash duration literal, e.g. `30 s`, `1 m`, `1 h`).
+
+For production / multi-replica deployments set `UPSTASH_REDIS_REST_URL` and
+`UPSTASH_REDIS_REST_TOKEN`. The in-memory fallback is per-process (caps at 10k
+tracked keys) and therefore under-counts behind a load balancer.
 
 ## Cron / incremental updates
 

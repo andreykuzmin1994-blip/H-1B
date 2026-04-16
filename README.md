@@ -74,6 +74,23 @@ npx prisma generate
 npm run dev
 ```
 
+## Public API stance
+
+The `/api/v1/*` endpoints are intentionally unauthenticated. This is a
+public-interest transparency tool built on public-record data. Do not add auth
+gates without discussion.
+
+Abuse control is per-IP rate limiting (`frontend/lib/ratelimit.ts`). Defaults:
+60 requests/minute, sliding window. Tune via `RATELIMIT_MAX` /
+`RATELIMIT_WINDOW`. For multi-instance deployments set `UPSTASH_REDIS_REST_URL`
+and `UPSTASH_REDIS_REST_TOKEN` — the in-memory fallback doesn't survive restarts
+or shard across replicas.
+
+Other hardening: strict CSP + security headers in `next.config.js`,
+Server Actions `allowedOrigins` driven by the `ALLOWED_ORIGINS` env var (wildcard
+is not permitted), Postgres bound to `127.0.0.1` in the dev compose file with
+credentials that must be set in `docker/.env`.
+
 ## Status
 
 Full Sprint 1-5 scaffolding implemented. See spec for phased build details.

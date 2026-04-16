@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { checkRateLimit } from '@/lib/ratelimit';
 
@@ -13,23 +14,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: 'bad_request' }, { status: 400 });
   }
   const depth = Math.min(Number(new URL(req.url).searchParams.get('depth') ?? '2'), 3);
-  const rows = await prisma.$queryRawUnsafe<any[]>(
-    `
+  const rows = await prisma.$queryRaw<Array<{ id: number | bigint; depth: number | bigint }>>(Prisma.sql`
     WITH RECURSIVE reachable(id, depth) AS (
-        SELECT $1::int, 0
+        SELECT ${id}::int, 0
       UNION
         SELECT CASE WHEN er.employer_id_a = r.id THEN er.employer_id_b ELSE er.employer_id_a END,
                r.depth + 1
           FROM entity_relationships er
           JOIN reachable r ON er.employer_id_a = r.id OR er.employer_id_b = r.id
-         WHERE r.depth < $2::int
+         WHERE r.depth < ${depth}::int
     )
     SELECT DISTINCT id, depth FROM reachable
-    `,
-    id,
-    depth,
-  );
-  const ids = rows.map((r: any) => Number(r.id));
+  `);
+  const ids = rows.map((r) => Number(r.id));
   if (ids.length === 0) return NextResponse.json({ nodes: [], edges: [] });
   const [employers, edges, violatorRows] = await Promise.all([
     prisma.employer.findMany({ where: { id: { in: ids } } }),
@@ -45,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     violatorRows.map((v) => v.employer_id).filter((v): v is number => v !== null),
   );
   const depthMap = new Map<number, number>(
-    rows.map((r: any) => [Number(r.id), Number(r.depth)]),
+    rows.map((r) => [Number(r.id), Number(r.depth)]),
   );
   return NextResponse.json({
     nodes: employers.map((e) => ({

@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { EntityGraph } from '@/components/EntityGraph';
 
@@ -7,10 +8,9 @@ export const dynamic = 'force-dynamic';
 export default async function GraphPage({ params }: { params: { id: string } }) {
   const id = Number(params.id);
   if (!Number.isFinite(id)) notFound();
-  const rows = await prisma.$queryRawUnsafe<any[]>(
-    `
+  const rows = await prisma.$queryRaw<Array<{ id: number | bigint; depth: number | bigint }>>(Prisma.sql`
     WITH RECURSIVE reachable(id, depth) AS (
-        SELECT $1::int, 0
+        SELECT ${id}::int, 0
       UNION
         SELECT CASE WHEN er.employer_id_a = r.id THEN er.employer_id_b ELSE er.employer_id_a END,
                r.depth + 1
@@ -19,10 +19,8 @@ export default async function GraphPage({ params }: { params: { id: string } }) 
          WHERE r.depth < 2
     )
     SELECT DISTINCT id, depth FROM reachable
-    `,
-    id,
-  );
-  const ids = rows.map((r: any) => Number(r.id));
+  `);
+  const ids = rows.map((r) => Number(r.id));
   const employers = ids.length ? await prisma.employer.findMany({ where: { id: { in: ids } } }) : [];
   const edges = ids.length
     ? await prisma.entityRelationship.findMany({
@@ -40,7 +38,7 @@ export default async function GraphPage({ params }: { params: { id: string } }) 
       .filter((v): v is number => !!v),
   );
   const depthMap = new Map<number, number>(
-    rows.map((r: any) => [Number(r.id), Number(r.depth)]),
+    rows.map((r) => [Number(r.id), Number(r.depth)]),
   );
   const graph = {
     nodes: employers.map((e) => ({
