@@ -1,27 +1,22 @@
-"""Seed reference data for the new fraud-detection triggers.
+"""Seed reference data for the fraud-detection triggers.
 
-Production deployments should replace these small seed lists with a full
+Production deployments should replace the small seed list with a full
 scrape / ingestion pipeline:
 
 * ``known_fraud_defendants`` — NER over DOJ / ICE / USCIS / state-AG
   press-release archives back to 2015. The seed below captures a handful of
   named defendants from the high-profile H-1B cases used in our research.
-* ``disciplined_practitioners`` — EOIR "Currently Disciplined Practitioners"
-  list (https://www.justice.gov/eoir/list-of-currently-disciplined-practitioners).
-  The seed below is empty by default to avoid staleness; callers should
-  ingest the live list.
 
-The seeders are idempotent and return ``(inserted, updated)`` counts.
+The seeder is idempotent and returns ``(inserted, updated)`` counts.
 """
 from __future__ import annotations
 
 from datetime import date
-from typing import Iterable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from h1b_engine.db.models import DisciplinedPractitioner, KnownFraudDefendant
+from h1b_engine.db.models import KnownFraudDefendant
 from h1b_engine.utils.names import normalize_employer_name
 
 
@@ -150,58 +145,6 @@ def seed_fraud_defendants(session: Session) -> tuple[int, int]:
                 source="SEED_DOJ_PRESS_RELEASE",
                 source_url=source_url,
                 notes=notes,
-            )
-        )
-        inserted += 1
-    return inserted, updated
-
-
-def add_disciplined_practitioners(
-    session: Session, rows: Iterable[dict]
-) -> tuple[int, int]:
-    """Insert disciplined-practitioner rows from the EOIR list scrape.
-
-    Each row should contain at minimum ``full_name`` and ``discipline_type``.
-    Optional: ``bar_id``, ``jurisdiction``, ``effective_date``,
-    ``reinstatement_date``, ``source_url``.
-    """
-    inserted = 0
-    updated = 0
-    for row in rows:
-        name = row["full_name"]
-        norm = normalize_employer_name(name)
-        bar_id = row.get("bar_id")
-        existing = session.execute(
-            select(DisciplinedPractitioner).where(
-                DisciplinedPractitioner.name_normalized == norm,
-                DisciplinedPractitioner.bar_id == bar_id,
-            )
-        ).scalar_one_or_none()
-        if existing:
-            for attr in (
-                "discipline_type",
-                "jurisdiction",
-                "effective_date",
-                "reinstatement_date",
-                "source_url",
-            ):
-                val = row.get(attr)
-                if val is not None:
-                    setattr(existing, attr, val)
-            updated += 1
-            continue
-        session.add(
-            DisciplinedPractitioner(
-                full_name=name,
-                name_normalized=norm,
-                bar_id=bar_id,
-                jurisdiction=row.get("jurisdiction"),
-                discipline_type=row.get("discipline_type"),
-                effective_date=row.get("effective_date"),
-                reinstatement_date=row.get("reinstatement_date"),
-                source=row.get("source", "EOIR"),
-                source_url=row.get("source_url"),
-                raw=row.get("raw"),
             )
         )
         inserted += 1

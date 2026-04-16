@@ -11,11 +11,7 @@ from sqlalchemy.orm import Session
 
 from h1b_engine.db.models import (
     AnomalyFlag,
-    DisciplinedPractitioner,
     Employer,
-    EmployerPayrollRecord,
-    EntityRelationship,
-    H1BRegistration,
     KnownFraudDefendant,
     LayoffEvent,
     LcaFiling,
@@ -34,8 +30,6 @@ from h1b_engine.score.flags import (
     LAYOFF_WINDOW_DAYS,
     NAICS_SOC_HARD_RULES,
     NON_SPECIALTY_SOCS,
-    PAYROLL_GAP_MIN_APPROVALS,
-    PAYROLL_GAP_RATIO,
     RELATIONSHIP_WEIGHTS,
     STAFFING_NAICS,
     FlagDefinition,
@@ -45,28 +39,6 @@ from h1b_engine.utils.names import normalize_employer_name
 log = logging.getLogger(__name__)
 
 FlagOutput = tuple[FlagDefinition, dict[str, Any], int | None]  # (flag, evidence, lca_filing_id)
-
-
-def _related_employer_ids(session: Session, employer_id: int) -> set[int]:
-    """Return employer_ids known to be related to ``employer_id`` via the graph.
-
-    Used by the MULTI_REGISTRATION_SAME_BENEFICIARY detector to avoid firing
-    when the "other" petitioner is actually a corporate affiliate.
-    """
-    rows = session.execute(
-        select(
-            EntityRelationship.employer_id_a, EntityRelationship.employer_id_b
-        ).where(
-            (EntityRelationship.employer_id_a == employer_id)
-            | (EntityRelationship.employer_id_b == employer_id)
-        )
-    ).all()
-    related: set[int] = set()
-    for a, b in rows:
-        related.add(a)
-        related.add(b)
-    related.discard(employer_id)
-    return related
 
 
 # --------------------------------------------------------------------------- #
@@ -183,67 +155,6 @@ def compute_violator_employer_ids(session: Session) -> set[int]:
 # --------------------------------------------------------------------------- #
 
 
-def compute_multi_registered_beneficiaries(
-    session: Session,
-) -> dict[int, list[dict[str, Any]]]:
-    """Map employer_id -> list of multi-registered beneficiary evidence dicts.
-
-    A beneficiary is "multi-registered" when the same
-    ``(normalized_name, dob, cap_year)`` or
-    ``(passport_country, passport_last4, cap_year)`` appears on registrations
-    from 2+ employer_ids.
-    """
-    rows = session.execute(select(H1BRegistration)).scalars().all()
-    if not rows:
-        return {}
-
-    # Group by stable identity key(s).
-    name_groups: dict[tuple, list[H1BRegistration]] = defaultdict(list)
-    passport_groups: dict[tuple, list[H1BRegistration]] = defaultdict(list)
-    for r in rows:
-        if r.beneficiary_name_normalized:
-            name_groups[
-                (
-                    r.beneficiary_name_normalized,
-                    r.beneficiary_date_of_birth,
-                    r.cap_fiscal_year,
-                )
-            ].append(r)
-        if r.passport_country and r.passport_last4:
-            passport_groups[
-                (r.passport_country, r.passport_last4, r.cap_fiscal_year)
-            ].append(r)
-
-    result: dict[int, list[dict[str, Any]]] = defaultdict(list)
-
-    def _record(group: list[H1BRegistration], key_kind: str, key_value: tuple) -> None:
-        employer_ids = {r.employer_id for r in group if r.employer_id is not None}
-        if len(employer_ids) < 2:
-            return
-        for r in group:
-            if r.employer_id is None:
-                continue
-            other = sorted(employer_ids - {r.employer_id})
-            if not other:
-                continue
-            result[r.employer_id].append(
-                {
-                    "cap_fiscal_year": r.cap_fiscal_year,
-                    "beneficiary_name_normalized": r.beneficiary_name_normalized,
-                    "key_kind": key_kind,
-                    "other_employer_ids": other,
-                    "registration_ids": [g.id for g in group],
-                }
-            )
-
-    for key, group in name_groups.items():
-        _record(group, "name_dob", key)
-    for key, group in passport_groups.items():
-        _record(group, "passport", key)
-
-    return dict(result)
-
-
 def compute_agent_clusters(
     session: Session, threshold: int = COMMON_AGENT_CLUSTER_THRESHOLD
 ) -> dict[int, dict[str, Any]]:
@@ -303,55 +214,6 @@ def compute_fraud_defendant_names(session: Session) -> dict[str, list[dict[str, 
     return dict(by_name)
 
 
-def compute_disciplined_attorneys(
-    session: Session,
-) -> dict[str, list[dict[str, Any]]]:
-    """Normalized-name -> list of discipline entries for attorney matching."""
-    rows = session.execute(select(DisciplinedPractitioner)).scalars().all()
-    by_name: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for r in rows:
-        by_name[r.name_normalized].append(
-            {
-                "bar_id": r.bar_id,
-                "jurisdiction": r.jurisdiction,
-                "discipline_type": r.discipline_type,
-                "effective_date": r.effective_date.isoformat()
-                if r.effective_date
-                else None,
-                "reinstatement_date": r.reinstatement_date.isoformat()
-                if r.reinstatement_date
-                else None,
-                "source_url": r.source_url,
-            }
-        )
-    return dict(by_name)
-
-
-def compute_payroll_by_employer_year(
-    session: Session,
-) -> dict[int, dict[int, dict[str, Any]]]:
-    """employer_id -> fiscal_year -> {worker_count, total_wages, sources}."""
-    rows = session.execute(select(EmployerPayrollRecord)).scalars().all()
-    result: dict[int, dict[int, dict[str, Any]]] = defaultdict(dict)
-    for r in rows:
-        if r.employer_id is None:
-            continue
-        existing = result[r.employer_id].get(r.fiscal_year)
-        new_count = int(r.worker_count) if r.worker_count is not None else 0
-        new_wages = float(r.total_wages) if r.total_wages is not None else 0.0
-        if existing:
-            existing["worker_count"] = max(existing["worker_count"], new_count)
-            existing["total_wages"] = max(existing["total_wages"], new_wages)
-            existing["sources"].add(r.source)
-        else:
-            result[r.employer_id][r.fiscal_year] = {
-                "worker_count": new_count,
-                "total_wages": new_wages,
-                "sources": {r.source},
-            }
-    return result
-
-
 # --------------------------------------------------------------------------- #
 # Per-employer detector
 # --------------------------------------------------------------------------- #
@@ -366,17 +228,11 @@ def detect_for_employer(
     soc_medians: dict[str, float],
     soc_denial_rates: dict[str, float],
     violator_ids: set[int],
-    multi_registrations: dict[int, list[dict[str, Any]]] | None = None,
     agent_clusters: dict[int, dict[str, Any]] | None = None,
     fraud_defendants: dict[str, list[dict[str, Any]]] | None = None,
-    disciplined_attorneys: dict[str, list[dict[str, Any]]] | None = None,
-    payroll_by_year: dict[int, dict[int, dict[str, Any]]] | None = None,
 ) -> list[FlagOutput]:
-    multi_registrations = multi_registrations or {}
     agent_clusters = agent_clusters or {}
     fraud_defendants = fraud_defendants or {}
-    disciplined_attorneys = disciplined_attorneys or {}
-    payroll_by_year = payroll_by_year or {}
     outputs: list[FlagOutput] = []
     filings = session.execute(
         select(LcaFiling).where(LcaFiling.employer_id == employer.id)
@@ -616,31 +472,6 @@ def detect_for_employer(
     layoff_outputs = detect_layoffs_with_concurrent_h1b(session, employer, filings)
     outputs.extend(layoff_outputs)
 
-    # -- MULTI_REGISTRATION_SAME_BENEFICIARY --------------------------------
-    multi_hits = multi_registrations.get(employer.id, [])
-    if multi_hits:
-        # Only surface genuinely unrelated-petitioner collisions: filter out
-        # cases where every other petitioner is inside our own entity-graph
-        # neighborhood (same family of employers).
-        related_ids = _related_employer_ids(session, employer.id)
-        external_hits = [
-            h for h in multi_hits if set(h["other_employer_ids"]) - related_ids
-        ]
-        if external_hits:
-            hit = external_hits[0]
-            outputs.append(
-                (
-                    ANOMALY_FLAGS["MULTI_REGISTRATION_SAME_BENEFICIARY"],
-                    {
-                        "cap_fiscal_year": hit["cap_fiscal_year"],
-                        "key_kind": hit["key_kind"],
-                        "colliding_employer_ids": hit["other_employer_ids"],
-                        "total_collisions": len(external_hits),
-                    },
-                    None,
-                )
-            )
-
     # -- COMMON_AGENT_CLUSTER -----------------------------------------------
     cluster = agent_clusters.get(employer.id)
     if cluster:
@@ -681,66 +512,6 @@ def detect_for_employer(
                     {
                         "matched_officer": matched_officer,
                         "matched_cases": matched_cases[:5],
-                    },
-                    None,
-                )
-            )
-
-    # -- NO_PAYROLL_FOR_H1B_VOLUME -----------------------------------------
-    payroll_years = payroll_by_year.get(employer.id, {})
-    uscis_by_year = session.execute(
-        select(
-            UscisEmployerStats.fiscal_year,
-            func.sum(UscisEmployerStats.initial_approvals),
-        )
-        .where(UscisEmployerStats.employer_id == employer.id)
-        .group_by(UscisEmployerStats.fiscal_year)
-    ).all()
-    for fy, approvals in uscis_by_year:
-        approvals = int(approvals or 0)
-        if approvals < PAYROLL_GAP_MIN_APPROVALS:
-            continue
-        payroll = payroll_years.get(fy)
-        worker_count = payroll["worker_count"] if payroll else 0
-        if worker_count == 0 or approvals > PAYROLL_GAP_RATIO * worker_count:
-            outputs.append(
-                (
-                    ANOMALY_FLAGS["NO_PAYROLL_FOR_H1B_VOLUME"],
-                    {
-                        "fiscal_year": fy,
-                        "h1b_initial_approvals": approvals,
-                        "reported_worker_count": worker_count,
-                        "payroll_sources": sorted(payroll["sources"])
-                        if payroll
-                        else [],
-                    },
-                    None,
-                )
-            )
-            break
-
-    # -- PREPARER_ON_EOIR_DISCIPLINE_LIST -----------------------------------
-    if disciplined_attorneys:
-        attorney_hit: tuple[str, dict[str, Any]] | None = None
-        for filing in filings:
-            norm = filing.attorney_name_normalized
-            if not norm:
-                continue
-            records = disciplined_attorneys.get(norm)
-            if records:
-                attorney_hit = (filing.attorney_name or norm, records[0])
-                break
-        if attorney_hit:
-            attorney_label, record = attorney_hit
-            outputs.append(
-                (
-                    ANOMALY_FLAGS["PREPARER_ON_EOIR_DISCIPLINE_LIST"],
-                    {
-                        "attorney": attorney_label,
-                        "discipline_type": record.get("discipline_type"),
-                        "jurisdiction": record.get("jurisdiction"),
-                        "effective_date": record.get("effective_date"),
-                        "source_url": record.get("source_url"),
                     },
                     None,
                 )

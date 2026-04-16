@@ -31,15 +31,6 @@ def generate_report(employer_id: int) -> str:
     address = data["address_verification"]
     corp = data["opencorporates"]
     layoffs = data.get("layoffs", {"count": 0, "events": [], "concurrent_filings": []})
-    personnel = data.get(
-        "personnel",
-        {
-            "beneficiary_count": 0,
-            "flag_count": 0,
-            "flag_summary": {},
-            "top_flags": [],
-        },
-    )
 
     lines: list[str] = []
     lines.append("EMPLOYER INVESTIGATION REPORT")
@@ -218,38 +209,6 @@ def generate_report(employer_id: int) -> str:
                 )
     lines.append("")
 
-    # Personnel / credential verification
-    lines.append(_rule("PERSONNEL CREDENTIAL VERIFICATION"))
-    lines.append("")
-    if personnel.get("beneficiary_count", 0) == 0:
-        lines.append(
-            "No beneficiary records on file. "
-            "Run `python scripts/personnel.py lookup --employer-id <id>` "
-            "after ingesting I-129 / FOIA / tip data to verify claimed "
-            "university, degree, signatory, and evaluator."
-        )
-    else:
-        lines.append(
-            f"Beneficiaries on file: {personnel['beneficiary_count']} | "
-            f"With credential flags: {personnel.get('beneficiaries_with_flags', 0)} | "
-            f"Total credential score: "
-            f"{personnel.get('total_credential_score', 0):.0f}"
-        )
-        if personnel.get("flag_summary"):
-            lines.append("Flag counts:")
-            for ftype, cnt in sorted(
-                personnel["flag_summary"].items(), key=lambda kv: -kv[1]
-            ):
-                lines.append(f"  - {ftype}: {cnt}")
-        if personnel.get("top_flags"):
-            lines.append("Highest-severity credential flags:")
-            for f in personnel["top_flags"][:5]:
-                lines.append(
-                    f"  - [{f['severity']}] {f['type']} "
-                    f"({f['score']:.0f} pts) — {f['description']}"
-                )
-    lines.append("")
-
     # Address
     lines.append(_rule("ADDRESS VERIFICATION"))
     lines.append("")
@@ -264,7 +223,7 @@ def generate_report(employer_id: int) -> str:
     # Recommendation
     lines.append(_rule("RECOMMENDED ACTION"))
     lines.append("")
-    recs = _recommendations(flags, lca, wages, violations, personnel=personnel)
+    recs = _recommendations(flags, lca, wages, violations)
     if recs:
         lines.append("File LCA complaint with DOL Wage and Hour Division citing:")
         for i, r in enumerate(recs, 1):
@@ -281,12 +240,9 @@ def generate_report(employer_id: int) -> str:
     return "\n".join(lines)
 
 
-def _recommendations(flags, lca, wages, violations, personnel=None) -> list[str]:
+def _recommendations(flags, lca, wages, violations) -> list[str]:
     recs: list[str] = []
     flag_types = {f["type"] for f in flags.get("flags", [])}
-    credential_flag_types: set[str] = set()
-    if personnel:
-        credential_flag_types = set(personnel.get("flag_summary", {}).keys())
     if "NAICS_SOC_MISMATCH" in flag_types or "NON_SPECIALTY_SOC" in flag_types:
         recs.append("Misrepresentation of job duties (NAICS-SOC mismatch)")
     if "WAGE_FAR_BELOW_SOC_MEDIAN" in flag_types or "WAGE_BELOW_PREVAILING" in flag_types:
@@ -312,12 +268,6 @@ def _recommendations(flags, lca, wages, violations, personnel=None) -> list[str]
             "H-1B occupation overlaps the job family affected by the "
             "concurrent layoff"
         )
-    if "MULTI_REGISTRATION_SAME_BENEFICIARY" in flag_types:
-        recs.append(
-            "Same beneficiary registered across unrelated petitioners in "
-            "the same cap season (beneficiary-centric selection integrity "
-            "violation, 8 CFR 214.2(h)(8)(iii))"
-        )
     if "COMMON_AGENT_CLUSTER" in flag_types:
         recs.append(
             "Petitioner sits inside an industrialized shell-employer "
@@ -329,82 +279,10 @@ def _recommendations(flags, lca, wages, violations, personnel=None) -> list[str]
             "Corporate officer previously named in a DOJ/ICE visa-fraud "
             "enforcement action"
         )
-    if "NO_PAYROLL_FOR_H1B_VOLUME" in flag_types:
-        recs.append(
-            "USCIS H-1B approval volume exceeds employer's reported "
-            "payroll footprint (ghost-employer pattern per DHS OIG-18-03)"
-        )
-    if "PREPARER_ON_EOIR_DISCIPLINE_LIST" in flag_types:
-        recs.append(
-            "G-28 attorney of record appears on EOIR's Currently "
-            "Disciplined Practitioners list"
-        )
     if "DOL_BENCHING_COMPLAINT_HISTORY" in flag_types:
         recs.append(
             "Prior DOL Wage and Hour Division finding of benching / "
             "nonproductive-status wage violation (20 CFR 655.731)"
-        )
-    # Credential / personnel flags surface under the I-129 fraud-indicator
-    # narrative (8 CFR 214.2(h)(4)(iii)(C) specialty-occupation proof, and
-    # 18 U.S.C. section 1546 fraud/misuse of visa documents).
-    if credential_flag_types & {
-        "UNIVERSITY_NOT_FOUND",
-        "DIPLOMA_MILL_UNIVERSITY",
-        "UNACCREDITED_UNIVERSITY",
-        "UNIVERSITY_CLOSED_BEFORE_GRADUATION",
-        "UNIVERSITY_FOUNDED_AFTER_GRADUATION",
-    }:
-        recs.append(
-            "Beneficiary credential references an unverifiable or "
-            "diploma-mill institution (potential 18 U.S.C. section 1546 "
-            "fraud; fails 8 CFR 214.2(h)(4)(iii)(C) specialty-occupation proof)"
-        )
-    if credential_flag_types & {
-        "DEGREE_NOT_OFFERED",
-        "DEGREE_LEVEL_NOT_OFFERED",
-        "DEGREE_NOT_OFFERED_IN_YEAR",
-    }:
-        recs.append(
-            "Claimed degree is not conferred by the named institution in "
-            "the claimed timeframe"
-        )
-    if credential_flag_types & {
-        "SIGNATORY_NOT_AT_UNIVERSITY",
-        "SIGNATORY_INACTIVE_AT_SIGN_DATE",
-        "SIGNATORY_DECEASED_AT_SIGN_DATE",
-        "SIGNATORY_EMAIL_DOMAIN_MISMATCH",
-    }:
-        recs.append(
-            "Transcript signatory cannot be matched to the institution's "
-            "registrar / faculty directory for the claimed signing window"
-        )
-    if credential_flag_types & {
-        "IMPOSSIBLE_GRADUATION_DATE",
-        "UNDERAGE_DEGREE",
-        "ENROLLMENT_AFTER_GRADUATION",
-        "DEGREE_DURATION_IMPLAUSIBLE",
-    }:
-        recs.append(
-            "Credential timeline is inconsistent with beneficiary's age or "
-            "normal degree progression"
-        )
-    if credential_flag_types & {
-        "DUPLICATE_BENEFICIARY_IDENTITY",
-        "PASSPORT_NUMBER_REUSE",
-    }:
-        recs.append(
-            "Identity markers (name/DOB or passport) reused across multiple "
-            "beneficiary records"
-        )
-    if "EVALUATOR_NOT_ACCREDITED" in credential_flag_types or "EVALUATOR_UNKNOWN" in credential_flag_types:
-        recs.append(
-            "Foreign-credential evaluation issued by a non-NACES / non-AICE "
-            "organization (unreliable for I-129 adjudication)"
-        )
-    if "DEGREE_FIELD_SOC_MISMATCH" in credential_flag_types:
-        recs.append(
-            "Claimed field of study has no recognized nexus with the SOC "
-            "occupation (8 CFR 214.2(h)(4)(ii))"
         )
     return recs
 
@@ -428,7 +306,6 @@ def tip_text(employer_id: int, data: dict[str, Any] | None = None) -> str:
         data.get("lca_history", {}),
         data.get("wage_benchmark", {}),
         data.get("enforcement", {}),
-        personnel=data.get("personnel", {}),
     ):
         parts.append(f"  - {r}")
     parts.append("Supporting public-data evidence:")
@@ -493,15 +370,4 @@ def tip_text(employer_id: int, data: dict[str, Any] | None = None) -> str:
     )
     for f in data.get("anomaly_flags", {}).get("flags", []):
         parts.append(f"  - [{f['severity']}] {f['description']}")
-
-    personnel = data.get("personnel") or {}
-    top_cred_flags = personnel.get("top_flags") or []
-    if top_cred_flags:
-        parts.append("")
-        parts.append(
-            "Beneficiary credential verification also surfaced the following "
-            "fraud indicators (18 U.S.C. section 1546; 8 CFR 214.2(h)(4)(iii)(C)):"
-        )
-        for f in top_cred_flags:
-            parts.append(f"  - [{f['severity']}] {f['description']}")
     return "\n".join(parts)

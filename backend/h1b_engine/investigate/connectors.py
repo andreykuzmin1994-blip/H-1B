@@ -15,10 +15,7 @@ from sqlalchemy import func, select
 from h1b_engine.db.base import get_session
 from h1b_engine.db.models import (
     AnomalyFlag,
-    Beneficiary,
-    CredentialFlag,
     Employer,
-    EntityRelationship,
     LayoffEvent,
     LcaFiling,
     SocWageBenchmark,
@@ -249,18 +246,6 @@ class OpenCorporatesConnector(InvestigationConnector):
         }
 
 
-class PublicWebPresenceConnector(InvestigationConnector):
-    """Stub for website / LinkedIn / BBB / Google Maps presence.
-
-    Phase 2 connector per spec. Returns a sentinel until implemented.
-    """
-
-    name = "public_web_presence"
-
-    def fetch(self, employer_id: int) -> dict[str, Any]:
-        return {"available": False, "reason": "not_implemented"}
-
-
 class LayoffConnector(InvestigationConnector):
     """Fetch WARN / layoffs.fyi notices and summarize H-1B concurrency.
 
@@ -365,65 +350,6 @@ class AnomalyFlagConnector(InvestigationConnector):
             }
 
 
-class PersonnelConnector(InvestigationConnector):
-    """Aggregate credential-verification results at the employer level.
-
-    Populated only when the Personnel Look-Up tool has been run against
-    beneficiaries linked to this employer. Individual names are intentionally
-    NOT surfaced here — the spec treats beneficiary names as PII. Callers who
-    need the per-beneficiary detail should use ``credentials.lookup``
-    directly.
-    """
-
-    name = "personnel"
-
-    def fetch(self, employer_id: int) -> dict[str, Any]:
-        with get_session() as session:
-            beneficiaries = session.execute(
-                select(Beneficiary).where(Beneficiary.employer_id == employer_id)
-            ).scalars().all()
-            if not beneficiaries:
-                return {
-                    "beneficiary_count": 0,
-                    "flag_count": 0,
-                    "flag_summary": {},
-                    "beneficiaries_with_flags": 0,
-                }
-            flags = session.execute(
-                select(CredentialFlag).where(
-                    CredentialFlag.employer_id == employer_id
-                )
-            ).scalars().all()
-            flag_summary: Counter[str] = Counter(f.flag_type for f in flags)
-            severity_summary: Counter[str] = Counter(
-                f.flag_severity for f in flags if f.flag_severity
-            )
-            flagged = {f.beneficiary_id for f in flags}
-            total_score = sum(float(f.flag_score) for f in flags)
-            sources: Counter[str] = Counter(b.source for b in beneficiaries)
-            return {
-                "beneficiary_count": len(beneficiaries),
-                "beneficiaries_with_flags": len(flagged),
-                "flag_count": len(flags),
-                "total_credential_score": round(total_score, 2),
-                "flag_summary": dict(flag_summary),
-                "severity_summary": dict(severity_summary),
-                "sources": dict(sources),
-                "top_flags": [
-                    {
-                        "type": f.flag_type,
-                        "severity": f.flag_severity,
-                        "score": float(f.flag_score),
-                        "description": f.description,
-                        "evidence": f.evidence,
-                    }
-                    for f in sorted(
-                        flags, key=lambda r: float(r.flag_score), reverse=True
-                    )[:10]
-                ],
-            }
-
-
 CONNECTORS: list[InvestigationConnector] = [
     AnomalyFlagConnector(),
     LCAHistoryConnector(),
@@ -434,7 +360,6 @@ CONNECTORS: list[InvestigationConnector] = [
     AddressVerificationConnector(),
     OpenCorporatesConnector(),
     LayoffConnector(),
-    PersonnelConnector(),
 ]
 
 

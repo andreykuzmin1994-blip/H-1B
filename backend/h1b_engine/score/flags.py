@@ -118,16 +118,6 @@ ANOMALY_FLAGS: dict[str, FlagDefinition] = {
             "industry/reason signal"
         ),
     ),
-    "MULTI_REGISTRATION_SAME_BENEFICIARY": FlagDefinition(
-        type="MULTI_REGISTRATION_SAME_BENEFICIARY",
-        severity="CRITICAL",
-        score=40,
-        description=(
-            "Same beneficiary registered in the same cap season by this "
-            "employer and at least one unrelated petitioner (per USCIS "
-            "beneficiary-centric selection rule, 8 CFR 214.2(h)(8)(iii))"
-        ),
-    ),
     "COMMON_AGENT_CLUSTER": FlagDefinition(
         type="COMMON_AGENT_CLUSTER",
         severity="CRITICAL",
@@ -144,25 +134,6 @@ ANOMALY_FLAGS: dict[str, FlagDefinition] = {
         description=(
             "Corporate officer named in a prior DOJ/ICE/USCIS visa-fraud "
             "indictment or settlement"
-        ),
-    ),
-    "NO_PAYROLL_FOR_H1B_VOLUME": FlagDefinition(
-        type="NO_PAYROLL_FOR_H1B_VOLUME",
-        severity="CRITICAL",
-        score=40,
-        description=(
-            "USCIS approval count materially exceeds the employer's state "
-            "UI / QCEW / Form 941 worker count for the same year (ghost "
-            "employer pattern per DHS OIG-18-03)"
-        ),
-    ),
-    "PREPARER_ON_EOIR_DISCIPLINE_LIST": FlagDefinition(
-        type="PREPARER_ON_EOIR_DISCIPLINE_LIST",
-        severity="CRITICAL",
-        score=35,
-        description=(
-            "G-28 attorney / preparer of record appears on EOIR's "
-            "Currently Disciplined Practitioners list"
         ),
     ),
     "DOL_BENCHING_COMPLAINT_HISTORY": FlagDefinition(
@@ -250,15 +221,6 @@ BUSINESS_PARK_KEYWORDS: tuple[str, ...] = (
 
 # Minimum cluster size for the COMMON_AGENT_CLUSTER detector.
 COMMON_AGENT_CLUSTER_THRESHOLD: int = 3
-
-# Minimum USCIS initial-approval volume before we even evaluate the
-# NO_PAYROLL_FOR_H1B_VOLUME detector (below this we have too little signal).
-PAYROLL_GAP_MIN_APPROVALS: int = 5
-
-# Ratio of (H-1B approvals / reported workers) that triggers the payroll-gap
-# flag. 1.5 captures ghost employers where approvals structurally exceed
-# the rest of the workforce.
-PAYROLL_GAP_RATIO: float = 1.5
 
 # Substring tokens used to match DOL WHD violation rows for the benching /
 # nonproductive-status pattern. Matched case-insensitively against the

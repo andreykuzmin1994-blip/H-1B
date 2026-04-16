@@ -18,10 +18,9 @@ backend/                  Python data pipeline + scoring + investigation engine
     score/                Anomaly scoring
     graph/                Entity relationship graph
     investigate/          AutoResearch investigation framework
-    credentials/          Personnel Look-Up / credential verification tool
     utils/                Shared helpers (wage normalization, name normalization)
   migrations/             Alembic migrations
-  scripts/                CLI entrypoints (ingest.py, score.py, graph.py, investigate.py, personnel.py)
+  scripts/                CLI entrypoints (ingest.py, score.py, graph.py, investigate.py)
   tests/                  Unit tests
 frontend/                 Next.js 14 (App Router) web dashboard
   app/                    Routes
@@ -61,11 +60,6 @@ python scripts/graph.py build-all
 
 # Sprint 5: investigate
 python scripts/investigate.py --employer-id 1 --output report
-
-# Sprint 6: personnel credential verification (after ingesting I-129 / FOIA / tip data)
-python scripts/personnel.py bootstrap            # seed diploma-mill + evaluator lists
-python scripts/personnel.py lookup --employer-id 1
-python scripts/personnel.py lookup --beneficiary-id 42 --json-out reports/b42.json
 
 # Frontend
 cd ../frontend

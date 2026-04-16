@@ -32,7 +32,6 @@ EXPECTED_CONNECTOR_KEYS = {
     "address_verification",
     "opencorporates",
     "layoffs",
-    "personnel",
 }
 
 
